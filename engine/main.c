@@ -7,7 +7,6 @@
 #include "vulkan/vulkan_core.h"
 #include <stdint.h>
 #include <stdio.h>
-#include <stdlib.h>
 
 // TODO: Move to renderer's abstraction layer
 // Checks the given expression's return value is OK.
@@ -22,17 +21,70 @@ typedef struct App {
 
     // TODO: Move this to an abstraction layer
     VkInstance instance;
+    VkAllocationCallbacks* allocator;
+    VkDebugUtilsMessengerEXT debugMessenger;
 } App;
 
 static App* app;
 
+static VKAPI_ATTR VkBool32 VKAPI_CALL
+debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+              VkDebugUtilsMessageTypeFlagsEXT messageType,
+              const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
+              void* pUserData) {
+    switch (messageSeverity) {
+        default:
+        case VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT:
+            FERROR(pCallbackData->pMessage);
+            break;
+        case VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT:
+            FWARN(pCallbackData->pMessage);
+            break;
+        case VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT:
+            FINFO(pCallbackData->pMessage);
+            break;
+        case VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT:
+            FTRACE(pCallbackData->pMessage);
+            break;
+    };
+    return VK_FALSE;
+}
+
+VkResult createDebugUtilsMessengerEXT(
+    VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo,
+    const VkAllocationCallbacks* pAllocator,
+    VkDebugUtilsMessengerEXT* pDebugMessenger) {
+    PFN_vkCreateDebugUtilsMessengerEXT func =
+        (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(
+            instance, "vkCreateDebugUtilsMessengerEXT");
+    if (func != 0) {
+        return func(instance, pCreateInfo, pAllocator, pDebugMessenger);
+    } else {
+        return VK_ERROR_EXTENSION_NOT_PRESENT;
+    }
+}
+
+void destroyDebugUtilsMessengerEXT(VkInstance instance,
+                                   VkDebugUtilsMessengerEXT debugMessenger,
+                                   const VkAllocationCallbacks* pAllocator) {
+    PFN_vkDestroyDebugUtilsMessengerEXT func =
+        (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(
+            instance, "vkDestroyDebugUtilsMessengerEXT");
+    if (func != 0) {
+        func(instance, debugMessenger, pAllocator);
+    }
+}
+
 int main(void) {
     printf("Hello There.\n");
-    app = (App*)malloc(sizeof(App));
 
     memorySystemSettings memorySettings;
     memorySettings.totalSize = GIGABYTES(1);
     memoryInit(memorySettings);
+
+    app = fallocate(sizeof(App), MEMORY_TAG_APPLICATION);
+
+    app->allocator = 0;
 
     app->platformMemReq = 0;
     platformStartup(&app->platformMemReq, 0, "Triangle", 0, 0, 1280, 720);
@@ -117,8 +169,35 @@ int main(void) {
         FERROR("Failed to create vk instance.\n");
     }
 
+#if defined(_DEBUG)
+    FDEBUG("Creating Vulkan debugger...");
+    u32 wantedLogSeverity =
+        VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT |
+        VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
+        VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT; //|
+                                                      //    VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT;
+
+    VkDebugUtilsMessengerEXT debugMessenger;
+    VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo = {
+        VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT};
+    debugCreateInfo.messageSeverity = wantedLogSeverity;
+    debugCreateInfo.messageType =
+        VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
+        VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT |
+        VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT;
+    debugCreateInfo.pfnUserCallback = debugCallback;
+
+    if (createDebugUtilsMessengerEXT(app->instance, &debugCreateInfo, app->allocator, &debugMessenger)){
+        FFATAL("Failed to setup debug messenger.");
+    }
+    FDEBUG("Vulkan debugger created.");
+#endif
+
     platformSleep(2000);
 
+#if defined(_DEBUG)
+    destroyDebugUtilsMessengerEXT(app->instance, debugMessenger, app->allocator);
+#endif // _Debug
     platformShutdown();
     memoryShutdown();
     return 0;
