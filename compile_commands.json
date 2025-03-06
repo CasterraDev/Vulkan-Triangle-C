@@ -18,5 +18,85 @@
     "directory": "/home/cas/vulkan-triangle",
     "file": "/home/cas/vulkan-triangle/engine/main.c",
     "output": "/home/cas/vulkan-triangle/obj/engine/main.c.o"
+  },
+  {
+    "arguments": [
+      "/usr/bin/clang",
+      "-g",
+      "-Werror=vla",
+      "-fPIC",
+      "-fdeclspec",
+      "-c",
+      "-D_DEBUG",
+      "-DFSN_EXPORT",
+      "-Iengine/",
+      "-I/home/cas/vulkanSDK/1.4.304.1/x86_64/include",
+      "-o",
+      "obj/engine/core/logger.c.o",
+      "engine/core/logger.c"
+    ],
+    "directory": "/home/cas/vulkan-triangle",
+    "file": "/home/cas/vulkan-triangle/engine/core/logger.c",
+    "output": "/home/cas/vulkan-triangle/obj/engine/core/logger.c.o"
+  },
+  {
+    "arguments": [
+      "/usr/bin/clang",
+      "-g",
+      "-Werror=vla",
+      "-fPIC",
+      "-fdeclspec",
+      "-c",
+      "-D_DEBUG",
+      "-DFSN_EXPORT",
+      "-Iengine/",
+      "-I/home/cas/vulkanSDK/1.4.304.1/x86_64/include",
+      "-o",
+      "obj/engine/core/event.c.o",
+      "engine/core/event.c"
+    ],
+    "directory": "/home/cas/vulkan-triangle",
+    "file": "/home/cas/vulkan-triangle/engine/core/event.c",
+    "output": "/home/cas/vulkan-triangle/obj/engine/core/event.c.o"
+  },
+  {
+    "arguments": [
+      "/usr/bin/clang",
+      "-g",
+      "-Werror=vla",
+      "-fPIC",
+      "-fdeclspec",
+      "-c",
+      "-D_DEBUG",
+      "-DFSN_EXPORT",
+      "-Iengine/",
+      "-I/home/cas/vulkanSDK/1.4.304.1/x86_64/include",
+      "-o",
+      "obj/engine/platform/linux/platformLinux.c.o",
+      "engine/platform/linux/platformLinux.c"
+    ],
+    "directory": "/home/cas/vulkan-triangle",
+    "file": "/home/cas/vulkan-triangle/engine/platform/linux/platformLinux.c",
+    "output": "/home/cas/vulkan-triangle/obj/engine/platform/linux/platformLinux.c.o"
+  },
+  {
+    "arguments": [
+      "/usr/bin/clang",
+      "-g",
+      "-Werror=vla",
+      "-fPIC",
+      "-fdeclspec",
+      "-c",
+      "-D_DEBUG",
+      "-DFSN_EXPORT",
+      "-Iengine/",
+      "-I/home/cas/vulkanSDK/1.4.304.1/x86_64/include",
+      "-o",
+      "obj/engine/platform/windows/platformWin32.c.o",
+      "engine/platform/windows/platformWin32.c"
+    ],
+    "directory": "/home/cas/vulkan-triangle",
+    "file": "/home/cas/vulkan-triangle/engine/platform/windows/platformWin32.c",
+    "output": "/home/cas/vulkan-triangle/obj/engine/platform/windows/platformWin32.c.o"
   }
 ]

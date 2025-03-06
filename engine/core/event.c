@@ -1,6 +1,6 @@
 #include "core/event.h"
 #include "core/fmemory.h"
-#include "helpers/dinoArray.h"
+#include "helpers/dinoarray.h"
 #include "core/logger.h"
 
 typedef struct registeredEvent {

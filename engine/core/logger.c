@@ -1,7 +1,7 @@
 #include "logger.h"
 #include "platform/platform.h"
 #include "platform/filesystem.h"
-#include "helpers/dinoArray.h"
+#include "helpers/dinoarray.h"
 
 // TODO: temporary
 #include <stdio.h>

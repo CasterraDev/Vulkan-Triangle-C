@@ -5,7 +5,7 @@
 
 #include "core/logger.h"
 #include "core/input.h"
-#include "helpers/dinoArray.h"
+#include "helpers/dinoarray.h"
 #include "renderer/vulkan/vulkanPlatform.h"
 #include "core/event.h"
 

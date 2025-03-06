@@ -9,7 +9,7 @@
 #include "core/event.h"
 #include "core/input.h"
 #include "core/logger.h"
-#include "helpers/dinoArray.h"
+#include "helpers/dinoarray.h"
 /*#include "renderer/vulkan/vulkanPlatform.h"*/
 
 #include <X11/XKBlib.h>   // sudo apt-get install libx11-dev
