@@ -10,11 +10,6 @@
 #define APP_HEIGHT 720
 
 // TODO: Move to renderer's abstraction layer
-// Checks the given expression's return value is OK.
-#define VK_CHECK(expr)                                                         \
-    {                                                                          \
-        FFATAL(expr == VK_SUCCESS);                                            \
-    }
 
 
 typedef struct App {

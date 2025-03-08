@@ -2,6 +2,7 @@
  * I stole this from somewhere. Can't find it again
  */
 #include "platform/platform.h"
+#include "renderer/vulkan/vulkanTypes.h"
 
 // Linux platform layer.
 #if FSNPLATFORM_LINUX
@@ -10,7 +11,7 @@
 #include "core/input.h"
 #include "core/logger.h"
 #include "helpers/dinoarray.h"
-/*#include "renderer/vulkan/vulkanPlatform.h"*/
+#include "renderer/vulkan/vulkanPlatform.h"
 
 #include <X11/XKBlib.h>   // sudo apt-get install libx11-dev
 #include <X11/Xlib-xcb.h> // sudo apt-get install libxkbcommon-x11-dev
@@ -314,22 +315,22 @@ void platformGetRequiredExts(const char*** array) {
 }
 
 // Surface creation for Vulkan
-/*b8 platformCreateVulkanSurface(vulkanHeader* header) {*/
-/*    VkXcbSurfaceCreateInfoKHR createInfo = {*/
-/*        VK_STRUCTURE_TYPE_XCB_SURFACE_CREATE_INFO_KHR};*/
-/*    createInfo.connection = systemPtr->connection;*/
-/*    createInfo.window = systemPtr->window;*/
-/**/
-/*    VkResult result = vkCreateXcbSurfaceKHR(*/
-/*        header->instance, &createInfo, header->allocator, &systemPtr->surface);*/
-/*    if (result != VK_SUCCESS) {*/
-/*        FFATAL("Vulkan surface creation failed.");*/
-/*        return false;*/
-/*    }*/
-/**/
-/*    header->surface = systemPtr->surface;*/
-/*    return true;*/
-/*}*/
+b8 platformCreateVulkanSurface(VulkanInfo* header) {
+    VkXcbSurfaceCreateInfoKHR createInfo = {
+        VK_STRUCTURE_TYPE_XCB_SURFACE_CREATE_INFO_KHR};
+    createInfo.connection = systemPtr->connection;
+    createInfo.window = systemPtr->window;
+
+    VkResult result = vkCreateXcbSurfaceKHR(
+        header->instance, &createInfo, header->allocator, &systemPtr->surface);
+    if (result != VK_SUCCESS) {
+        FFATAL("Vulkan surface creation failed.");
+        return false;
+    }
+
+    header->surface = systemPtr->surface;
+    return true;
+}
 
 // Key translation
 keys translateKeycodeWinToXCB(u32 x_keycode) {

@@ -3,6 +3,12 @@
 #include "defines.h"
 #include "vulkan/vulkan_core.h"
 
+// Checks the given expression's return value is OK.
+#define VK_CHECK(expr)                                                         \
+    {                                                                          \
+        FASSERT(expr == VK_SUCCESS);                                           \
+    }
+
 typedef struct VulkanSwapchainSupportInfo {
     VkSurfaceCapabilitiesKHR capabilities;
     u32 formatCnt;
@@ -38,5 +44,6 @@ typedef struct VulkanInfo {
     VkAllocationCallbacks* allocator;
     VkDebugUtilsMessengerEXT debugMessenger;
     VulkanDevice device;
+    VkSurfaceKHR surface;
 
 } VulkanInfo;

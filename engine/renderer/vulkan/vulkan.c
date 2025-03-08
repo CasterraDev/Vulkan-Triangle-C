@@ -1,8 +1,10 @@
 #include "core/fstring.h"
 #include "core/logger.h"
 #include "helpers/dinoarray.h"
-#include "platform/platform.h"
 #include "renderer/renderTypes.h"
+#include "renderer/vulkan/device.h"
+#include "renderer/vulkan/vulkanPlatform.h"
+#include "vulkan/vulkan_core.h"
 #include "vulkanTypes.h"
 
 static VulkanInfo header;
@@ -41,17 +43,6 @@ VkResult createDebugUtilsMessengerEXT(
         return func(instance, pCreateInfo, pAllocator, pDebugMessenger);
     } else {
         return VK_ERROR_EXTENSION_NOT_PRESENT;
-    }
-}
-
-void destroyDebugUtilsMessengerEXT(VkInstance instance,
-                                   VkDebugUtilsMessengerEXT debugMessenger,
-                                   const VkAllocationCallbacks* pAllocator) {
-    PFN_vkDestroyDebugUtilsMessengerEXT func =
-        (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(
-            instance, "vkDestroyDebugUtilsMessengerEXT");
-    if (func != NULL) {
-        func(instance, debugMessenger, pAllocator);
     }
 }
 
@@ -157,7 +148,6 @@ b8 vulkanInit(rendererBackend* backend, const char* appName, u64 appWidth,
                             VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT |
                             VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT;
 
-    VkDebugUtilsMessengerEXT debugMessenger;
     VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo = {
         VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT};
     debugCreateInfo.messageSeverity = wantedLogSeverity;
@@ -169,18 +159,43 @@ b8 vulkanInit(rendererBackend* backend, const char* appName, u64 appWidth,
 
     if (createDebugUtilsMessengerEXT(header.instance, &debugCreateInfo,
                                      header.allocator,
-                                     &debugMessenger) != VK_SUCCESS) {
+                                     &header.debugMessenger) != VK_SUCCESS) {
         FFATAL("Failed to setup debug messenger.");
     }
     FDEBUG("Vulkan debugger created.");
 #endif
 
+    if (!platformCreateVulkanSurface(&header)) {
+        FERROR("Failed to create surface");
+        return false;
+    }
+
+    if (!getVulkanDevice(&header)) {
+        FERROR("Failed to create surface");
+        return false;
+    }
+
     return true;
 }
 
 void vulkanShutdown(rendererBackend* backend) {
+    FINFO("Shutting down Vulkan.");
+    vkDeviceWaitIdle(header.device.device);
 #if defined(_DEBUG)
-    destroyDebugUtilsMessengerEXT(header.instance, header.debugMessenger,
-                                  header.allocator);
+    if (header.debugMessenger) {
+        FDEBUG("Destroying Vulkan debugger...");
+        PFN_vkDestroyDebugUtilsMessengerEXT func =
+            (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(
+                header.instance, "vkDestroyDebugUtilsMessengerEXT");
+        func(header.instance, header.debugMessenger, header.allocator);
+    }
 #endif
+
+    vkDestroyCommandPool(header.device.device,
+                         header.device.graphicsCommandPool, header.allocator);
+    vkDestroyDevice(header.device.device, header.allocator);
+    header.device.physicalDevice = 0;
+
+    vkDestroySurfaceKHR(header.instance, header.surface, header.allocator);
+    vkDestroyInstance(header.instance, header.allocator);
 }

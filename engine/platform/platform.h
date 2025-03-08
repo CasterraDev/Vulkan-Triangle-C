@@ -19,6 +19,5 @@ void platformConsoleWrite(const char* msg, u8 color);
 void platformConsoleWriteError(const char* msg, u8 color);
 
 f64 platformGetAbsoluteTime();
-void platformGetRequiredExts(const char*** array);
 
 void platformSleep(u64 ms);
