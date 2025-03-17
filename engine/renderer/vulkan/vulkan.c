@@ -4,6 +4,7 @@
 #include "renderer/renderTypes.h"
 #include "renderer/vulkan/device.h"
 #include "renderer/vulkan/vulkanPlatform.h"
+#include "renderer/vulkan/vulkanSwapchain.h"
 #include "vulkan/vulkan_core.h"
 #include "vulkanTypes.h"
 
@@ -170,10 +171,12 @@ b8 vulkanInit(rendererBackend* backend, const char* appName, u64 appWidth,
         return false;
     }
 
-    if (!getVulkanDevice(&header)) {
+    if (!vulkanDeviceGetCreate(&header)) {
         FERROR("Failed to create surface");
         return false;
     }
+
+    vulkanSwapchainCreate(&header, appWidth, appHeight, &header.swapchain);
 
     return true;
 }
@@ -191,10 +194,7 @@ void vulkanShutdown(rendererBackend* backend) {
     }
 #endif
 
-    vkDestroyCommandPool(header.device.device,
-                         header.device.graphicsCommandPool, header.allocator);
-    vkDestroyDevice(header.device.device, header.allocator);
-    header.device.physicalDevice = 0;
+    vulkanDeviceDestroy(&header);
 
     vkDestroySurfaceKHR(header.instance, header.surface, header.allocator);
     vkDestroyInstance(header.instance, header.allocator);

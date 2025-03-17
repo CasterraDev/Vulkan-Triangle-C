@@ -1,7 +1,10 @@
 #include "device.h"
 #include "core/asserts.h"
+#include "core/fmemory.h"
+#include "core/fstring.h"
 #include "core/logger.h"
 #include "helpers/dinoarray.h"
+#include "renderer/vulkan/vulkanSwapchain.h"
 #include "vulkan/vulkan_core.h"
 
 typedef struct deviceRequirements {
@@ -21,6 +24,40 @@ typedef struct deviceQueueFamilyInfo {
     u32 computeFamilyIdx;
     u32 transferFamilyIdx;
 } deviceQueueFamilyInfo;
+
+void vulkanDeviceQuerySwapchainSupport(
+    VkPhysicalDevice physicalDevice, VkSurfaceKHR surface,
+    VulkanSwapchainSupportInfo* outSupportInfo) {
+    // Surface capabilities
+    VK_CHECK(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(
+        physicalDevice, surface, &outSupportInfo->capabilities));
+    // Surface formats
+    VK_CHECK(vkGetPhysicalDeviceSurfaceFormatsKHR(
+        physicalDevice, surface, &outSupportInfo->formatCnt, 0));
+    if (outSupportInfo->formatCnt != 0) {
+        if (!outSupportInfo->formats) {
+            outSupportInfo->formats = fallocate(sizeof(VkSurfaceFormatKHR) *
+                                                    outSupportInfo->formatCnt,
+                                                MEMORY_TAG_RENDERER);
+        }
+        VK_CHECK(vkGetPhysicalDeviceSurfaceFormatsKHR(
+            physicalDevice, surface, &outSupportInfo->formatCnt,
+            outSupportInfo->formats));
+    }
+    // Present modes
+    VK_CHECK(vkGetPhysicalDeviceSurfacePresentModesKHR(
+        physicalDevice, surface, &outSupportInfo->presentModeCnt, 0));
+    if (outSupportInfo->presentModeCnt != 0) {
+        if (!outSupportInfo->presentModes) {
+            outSupportInfo->presentModes = fallocate(
+                sizeof(VkPresentModeKHR) * outSupportInfo->presentModeCnt,
+                MEMORY_TAG_RENDERER);
+        }
+        VK_CHECK(vkGetPhysicalDeviceSurfacePresentModesKHR(
+            physicalDevice, surface, &outSupportInfo->presentModeCnt,
+            outSupportInfo->presentModes));
+    }
+}
 
 b8 createVulkanLogicalDevice(VulkanInfo* header) {
     FINFO("Creating logical device...");
@@ -100,6 +137,9 @@ b8 createVulkanLogicalDevice(VulkanInfo* header) {
                                  &header->device.graphicsCommandPool));
     FINFO("Graphics command pool created.");
 
+    vulkanDeviceQuerySwapchainSupport(header->device.physicalDevice,
+                                      header->surface,
+                                      &header->device.swapchainSupport);
     return true;
 }
 
@@ -116,6 +156,29 @@ b8 doesDeviceMeetRequirements(VkPhysicalDevice device, VkSurfaceKHR surface,
             return false;
         }
     }
+
+    u32 extLen;
+    vkEnumerateDeviceExtensionProperties(device, 0, &extLen, 0);
+    VkExtensionProperties* extArray =
+        dinoCreateReserve(extLen, VkExtensionProperties);
+    vkEnumerateDeviceExtensionProperties(device, 0, &extLen, extArray);
+
+    for (u32 i = 0; i < dinoLength(requirements->deviceExts); i++) {
+        b8 found = false;
+        for (u32 j = 0; j < extLen; j++) {
+            if (strEqualI(requirements->deviceExts[i],
+                          extArray[j].extensionName)) {
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            FERROR("Failed to find extension %s", requirements->deviceExts[i]);
+            dinoDestroy(extArray);
+            return false;
+        }
+    }
+    dinoDestroy(extArray);
 
     outQueuesInfo->graphicsFamilyIdx = -1;
     outQueuesInfo->presentFamilyIdx = -1;
@@ -163,7 +226,7 @@ b8 doesDeviceMeetRequirements(VkPhysicalDevice device, VkSurfaceKHR surface,
     return true;
 }
 
-b8 getVulkanDevice(VulkanInfo* vi) {
+b8 vulkanDeviceGetCreate(VulkanInfo* vi) {
     u32 deviceCnt = 0;
     vkEnumeratePhysicalDevices(vi->instance, &deviceCnt, 0);
 
@@ -277,4 +340,62 @@ b8 getVulkanDevice(VulkanInfo* vi) {
     }
 
     return true;
+}
+
+void vulkanDeviceDestroy(VulkanInfo* vi) {
+    vi->device.graphicsQueue = 0;
+    vi->device.presentQueue = 0;
+    vi->device.transferQueue = 0;
+
+    vulkanSwapchainDestroy(vi, &vi->swapchain);
+
+    vkDestroyCommandPool(vi->device.device,
+                         vi->device.graphicsCommandPool, vi->allocator);
+
+    vkDestroyDevice(vi->device.device, vi->allocator);
+
+    if (vi->device.swapchainSupport.formats){
+        ffree(vi->device.swapchainSupport.formats, sizeof(VkSurfaceFormatKHR) * vi->device.swapchainSupport.formatCnt, MEMORY_TAG_RENDERER);
+        vi->device.swapchainSupport.formatCnt = -1;
+    }
+
+    if (vi->device.swapchainSupport.presentModes){
+        ffree(vi->device.swapchainSupport.presentModes, sizeof(VkPresentModeKHR) * vi->device.swapchainSupport.presentModeCnt, MEMORY_TAG_RENDERER);
+        vi->device.swapchainSupport.presentModeCnt = -1;
+    }
+
+    fzeroMemory(&vi->device.swapchainSupport.capabilities, sizeof(vi->device.swapchainSupport.capabilities));
+
+    vi->device.physicalDevice = 0;
+
+    vi->device.graphicsQueueIdx = -1;
+    vi->device.presentQueueIdx = -1;
+    vi->device.transferQueueIdx = -1;
+}
+
+b8 vulkanDeviceDetectDepthFormat(VulkanDevice* device) {
+    // Format candidates
+    const u64 candidateCnt = 3;
+    VkFormat candidates[3] = {VK_FORMAT_D32_SFLOAT,
+                              VK_FORMAT_D32_SFLOAT_S8_UINT,
+                              VK_FORMAT_D24_UNORM_S8_UINT};
+
+    u32 flags = VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT;
+
+    device->depthFormat = VK_FORMAT_UNDEFINED;
+    for (u64 i = 0; i < candidateCnt; ++i) {
+        VkFormatProperties properties;
+        vkGetPhysicalDeviceFormatProperties(device->physicalDevice,
+                                            candidates[i], &properties);
+
+        if ((properties.linearTilingFeatures & flags) == flags) {
+            device->depthFormat = candidates[i];
+            return true;
+        } else if ((properties.optimalTilingFeatures & flags) == flags) {
+            device->depthFormat = candidates[i];
+            return true;
+        }
+    }
+
+    return false;
 }

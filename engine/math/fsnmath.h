@@ -30,6 +30,9 @@
 // Smallest positive number where 1.0 + FLOAT_EPSILON != 0
 #define FSN_FLOAT_EPSILON 1.192092896e-07f
 
+#define FCLAMP(value, min, max) (value <= min) ? min : (value >= max) ? max \
+                                                                      : value;
+
 // ------------------------------------------
 // General math functions
 // ------------------------------------------

@@ -9,6 +9,28 @@
         FASSERT(expr == VK_SUCCESS);                                           \
     }
 
+typedef struct VulkanImage {
+    VkImage handle;
+    VkDeviceMemory memory;
+    VkImageView view;
+    u32 width;
+    u32 height;
+    VkSampler sampler;
+} VulkanImage;
+
+typedef struct VulkanSwapchain {
+    VkSurfaceFormatKHR imgFormat;
+    u8 maxNumOfFramesInFlight;
+    VkSwapchainKHR handle;
+    u32 imageCnt;
+    VkImage* images;
+    VkImageView* views;
+    VulkanImage depthAttachment;
+
+    //Framebuffers used for on-screen rendering, one per frame
+    VkFramebuffer framebuffers[3];
+} VulkanSwapchain;
+
 typedef struct VulkanSwapchainSupportInfo {
     VkSurfaceCapabilitiesKHR capabilities;
     u32 formatCnt;
@@ -45,5 +67,7 @@ typedef struct VulkanInfo {
     VkDebugUtilsMessengerEXT debugMessenger;
     VulkanDevice device;
     VkSurfaceKHR surface;
+    VulkanSwapchain swapchain;
+    u32 currentFrame;
 
 } VulkanInfo;
