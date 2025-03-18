@@ -3,8 +3,8 @@
 #include "defines.h"
 #include "platform/platform.h"
 #include "renderer/renderer.h"
+#include "resources/resourceManager.h"
 #include <stdint.h>
-#include <stdio.h>
 
 #define APP_WIDTH 1280
 #define APP_HEIGHT 720
@@ -16,6 +16,9 @@ typedef struct App {
     u64 platformMemReq;
     void* platformState;
 
+    u64 resourceManagerMemReq;
+    void* resourceManagerState;
+
     u64 rendererMemReq;
     void* rendererState;
 } App;
@@ -23,7 +26,7 @@ typedef struct App {
 static App* app;
 
 int main(void) {
-    printf("Hello There.\n");
+    FINFO("Hello There.\n");
 
     memorySystemSettings memorySettings;
     memorySettings.totalSize = GIGABYTES(1);
@@ -36,6 +39,13 @@ int main(void) {
     app->platformState = fallocate(app->platformMemReq, MEMORY_TAG_APPLICATION);
     platformStartup(&app->platformMemReq, app->platformState, "Triangle", 0, 0,
                     APP_WIDTH, APP_HEIGHT);
+
+    resourceManagerSettings resourceManagerSettings;
+    resourceManagerSettings.maxManagers = 2;
+    resourceManagerSettings.rootAssetPath = "./Assets/";
+    resourceManagerInit(&app->resourceManagerMemReq, 0, resourceManagerSettings);
+    app->resourceManagerState = fallocate(app->resourceManagerMemReq, MEMORY_TAG_APPLICATION);
+    resourceManagerInit(&app->resourceManagerMemReq, app->resourceManagerState, resourceManagerSettings);
 
     rendererInit(&app->rendererMemReq, 0, "", APP_WIDTH, APP_HEIGHT);
     app->rendererState = fallocate(app->rendererMemReq, MEMORY_TAG_RENDERER);
