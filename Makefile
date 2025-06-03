@@ -14,6 +14,10 @@ SRC_FILES := $(shell find $(ASSEMBLY) -name *.c)		# .c files
 DIRECTORIES := $(shell find $(ASSEMBLY) -type d)		# directories with .h files
 OBJ_FILES := $(SRC_FILES:%=$(OBJ_DIR)/%.o)		# compiled .o objects
 
+# On linux I need to use a command called bear to compile the compile_commands.json
+# This let's me use bear without interferring with anyone else's compile commands
+PREFIX := $(prefix)
+
 all: build
 
 .PHONY: build
@@ -52,6 +56,6 @@ buildrun: build run
 
 $(OBJ_DIR)/%.c.o: %.c # compile .c to .o object
 	@echo   $<...
-	@clang $< $(COMPILER_FLAGS) -c -o $@ $(DEFINES) $(INCLUDE_FLAGS)
+	@$(PREFIX) clang $< $(COMPILER_FLAGS) -c -o $@ $(DEFINES) $(INCLUDE_FLAGS)
 
 -include $(OBJ_FILES:.o=.d)

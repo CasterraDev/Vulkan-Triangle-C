@@ -1,4 +1,5 @@
 #include "vulkanRenderpass.h"
+#include "core/fmemory.h"
 #include "helpers/dinoarray.h"
 #include "renderer/vulkan/vulkanCommandBuffers.h"
 #include "renderer/vulkan/vulkanTypes.h"
@@ -95,14 +96,14 @@ void vulkanRenderpassBegin(VulkanInfo* vi, VulkanCommandBuffer commandBuffer, Vu
     renderpassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
     renderpassInfo.renderPass = renderpass->handle;
     renderpassInfo.framebuffer = framebuffer;
-    renderpassInfo.clearValueCount = 1;
-    VkClearValue clearColor = {0.0f,1.0f,0.0f,1.0f};
     renderpassInfo.renderArea.offset.x = renderpass->renderArea.x;
     renderpassInfo.renderArea.offset.y = renderpass->renderArea.y;
     renderpassInfo.renderArea.extent.width = renderpass->renderArea.z;
     renderpassInfo.renderArea.extent.height = renderpass->renderArea.w;
-    renderpassInfo.pClearValues = &clearColor;
     renderpassInfo.pNext = 0;
+
+    renderpassInfo.clearValueCount = 1;
+    renderpassInfo.pClearValues = &(VkClearValue){renderpass->clearColor.r,renderpass->clearColor.g,renderpass->clearColor.b,renderpass->clearColor.a};
 
     vkCmdBeginRenderPass(commandBuffer.handle, &renderpassInfo, VK_SUBPASS_CONTENTS_INLINE);
 }

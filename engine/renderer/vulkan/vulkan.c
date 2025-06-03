@@ -199,7 +199,7 @@ b8 vulkanInit(rendererBackend* backend, const char* appName, u64 appWidth,
     VulkanRenderpassConfig rc;
     rc.renderArea =
         (vector4){0, 0, header.framebufferWidth, header.framebufferHeight};
-    rc.clearColor = (vector4){0, 0, 0.2f, 1.0f};
+    rc.clearColor = (vector4){.68f, .85f, .90f, 1.0f};
     rc.depth = 1.0f;
     rc.stencil = 0;
     rc.hasPrevPass = false;
