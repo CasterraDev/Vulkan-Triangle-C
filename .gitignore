@@ -2,4 +2,5 @@ build*/
 */build*/
 .cache*/
 obj*/
-bin*/
+bin*/engine
+bin*/Assets/*.spv

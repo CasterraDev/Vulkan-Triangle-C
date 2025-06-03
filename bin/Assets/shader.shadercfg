@@ -1,0 +1,5 @@
+name=FirstShader
+renderpass=world
+stages=vert,frag
+stagefiles=vert.spv,frag.spv
+
