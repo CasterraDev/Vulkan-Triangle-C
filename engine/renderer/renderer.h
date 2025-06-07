@@ -9,6 +9,7 @@ b8 rendererInit(u64* memoryRequirement, void* memoryState, const char* appName, 
 void rendererShutdown();
 
 b8 rendererDraw(renderInfo* ri);
+b8 rendererOnResized(u16 width, u16 height);
 
 b8 rendererShaderCreate(const struct ShaderRS* srs, struct Shader* outShader);
 b8 rendererShaderDelete(struct Shader* shader);

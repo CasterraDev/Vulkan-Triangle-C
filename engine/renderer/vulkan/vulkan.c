@@ -231,7 +231,7 @@ b8 vulkanInit(rendererBackend* backend, const char* appName, u64 appWidth,
     if (!header.graphicsCommandBuffers) {
         header.graphicsCommandBuffers =
             dinoCreateReserve(header.swapchain.imageCnt, VulkanCommandBuffer);
-        dinoClear(&header.graphicsCommandBuffers);
+        dinoLengthSet(header.graphicsCommandBuffers, header.swapchain.imageCnt);
     }
 
     for (u32 i = 0; i < header.swapchain.imageCnt; i++) {
@@ -245,6 +245,7 @@ b8 vulkanInit(rendererBackend* backend, const char* appName, u64 appWidth,
 
         vulkanCommandBufferAllocate(&header, header.device.graphicsCommandPool,
                                     true, &header.graphicsCommandBuffers[i]);
+        dinoLengthSet(header.graphicsCommandBuffers, header.swapchain.imageCnt);
     }
     FDEBUG("Created Command Buffers");
 
@@ -343,6 +344,13 @@ b8 vulkanDraw() {
     return true;
 }
 
+b8 vulkanOnResize(u16 width, u16 height){
+    header.framebufferWidth = width;
+    header.framebufferHeight = height;
+    header.framebufferSizeGen++;
+    return true;
+}
+
 b8 vulkanBeginFrame(struct rendererBackend* backend, f32 deltaTime) {
     header.deltaTime = deltaTime;
     VulkanDevice* dev = &header.device;
@@ -359,11 +367,18 @@ b8 vulkanBeginFrame(struct rendererBackend* backend, f32 deltaTime) {
 
     // Means the window has most likely been resized
     if (header.framebufferSizeGen != header.framebufferSizeGenLast) {
+        header.recreatingSwapchain = true;
         VkResult res = vkDeviceWaitIdle(dev->device);
         if (!successfullVulkanResult(res)) {
             FERROR("Vulkan Renderer vkDeviceWaitIdle failed: %s",
                    vulkanResultStr(res, true));
             return false;
+        }
+        // Create framebuffers
+        for (u32 i = 0; i < 3; i++) {
+            vkDestroyFramebuffer(header.device.device,
+                                 header.swapchain.framebuffers[i],
+                                 header.allocator);
         }
 
         if (!vulkanSwapchainRecreate(&header, header.framebufferWidth,
@@ -372,7 +387,53 @@ b8 vulkanBeginFrame(struct rendererBackend* backend, f32 deltaTime) {
             return false;
         }
 
+        // Create framebuffers
+        for (u32 i = 0; i < 3; i++) {
+            VkImageView att[1] = {header.swapchain.views[i]};
+            VkFramebufferCreateInfo fci;
+            fci.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+            fci.renderPass = header.renderpass.handle;
+            fci.attachmentCount = 1;
+            fci.pAttachments = att;
+            fci.width = header.framebufferWidth;
+            fci.height = header.framebufferHeight;
+            fci.layers = 1;
+            fci.pNext = 0;
+            fci.flags = 0;
+
+            VK_CHECK(vkCreateFramebuffer(header.device.device, &fci,
+                                         header.allocator,
+                                         &header.swapchain.framebuffers[i]))
+        }
+        FDEBUG("Created Framebuffers");
+
+        if (!header.graphicsCommandBuffers) {
+            header.graphicsCommandBuffers = dinoCreateReserve(
+                header.swapchain.imageCnt, VulkanCommandBuffer);
+            dinoLengthSet(header.graphicsCommandBuffers,
+                          header.swapchain.imageCnt);
+        }
+
+        for (u32 i = 0; i < header.swapchain.imageCnt; i++) {
+            if (header.graphicsCommandBuffers[i].handle) {
+                vkFreeCommandBuffers(header.device.device,
+                                     header.device.graphicsCommandPool, 1,
+                                     &header.graphicsCommandBuffers[i].handle);
+            }
+
+            dinoClear(&header.graphicsCommandBuffers);
+
+            vulkanCommandBufferAllocate(&header,
+                                        header.device.graphicsCommandPool, true,
+                                        &header.graphicsCommandBuffers[i]);
+            dinoLengthSet(header.graphicsCommandBuffers,
+                          header.swapchain.imageCnt);
+        }
+        FDEBUG("Created Command Buffers");
+
         FINFO("Resized. Booting...");
+        header.framebufferSizeGenLast = header.framebufferSizeGen;
+        header.recreatingSwapchain = false;
         return false;
     }
 
@@ -414,6 +475,9 @@ b8 vulkanBeginFrame(struct rendererBackend* backend, f32 deltaTime) {
         (VkExtent2D){header.framebufferWidth, header.framebufferHeight};
     vkCmdSetScissor(header.graphicsCommandBuffers[header.curImageIdx].handle, 0,
                     1, &scissor);
+
+    header.renderpass.renderArea =
+        (vector4){0, 0, header.framebufferWidth, header.framebufferHeight};
     return true;
 }
 

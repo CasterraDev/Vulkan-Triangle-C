@@ -1,0 +1,22 @@
+[
+  {
+    "arguments": [
+      "/usr/bin/clang",
+      "-g",
+      "-Werror=vla",
+      "-fPIC",
+      "-fdeclspec",
+      "-c",
+      "-D_DEBUG",
+      "-DFSN_EXPORT",
+      "-Iengine/",
+      "-I/home/cas/vulkanSDK/1.4.304.1/x86_64/include",
+      "-o",
+      "obj/engine/renderer/vulkan/vulkan.c.o",
+      "engine/renderer/vulkan/vulkan.c"
+    ],
+    "directory": "/home/cas/Vulkan-Triangle-C",
+    "file": "/home/cas/Vulkan-Triangle-C/engine/renderer/vulkan/vulkan.c",
+    "output": "/home/cas/Vulkan-Triangle-C/obj/engine/renderer/vulkan/vulkan.c.o"
+  }
+]

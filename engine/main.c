@@ -47,7 +47,7 @@ b8 quitApp(u16 code, void* sender, void* listenerInst, eventContext ec){
 
 b8 appResized(u16 code, void* sender, void* listenerInst, eventContext ec){
     u16 width = ec.data.u16[0];
-    u16 height = ec.data.u16[0];
+    u16 height = ec.data.u16[1];
 
     app->width = width;
     app->height = height;
@@ -57,6 +57,7 @@ b8 appResized(u16 code, void* sender, void* listenerInst, eventContext ec){
         return true;
     }else{
         // TODO: Renderer abstracted onResize FN
+        rendererOnResized(width, height);
     }
 
     return false;

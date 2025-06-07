@@ -69,7 +69,7 @@ void* _dino_insert_at(void* array, unsigned long long idx, void* valuePtr);
  *  Create a Dino array with a custom initial length.
  *  Same as `dinoCreateReserve` except it automatically sets length to the max length.
  *  This is good if you need an dynamic array for a hashmap where any spot may be filled/empty and is not filled linearly
- *  NOTE: `dinoPush`/`dinoPop` will still effect the length
+ *  NOTE: Should not use `dinoPush`/`dinoPop`, it will still effect the length
  */
 #define dinoCreateReserveWithLengthSet(length, type) _dino_create(length, sizeof(type), true);
 

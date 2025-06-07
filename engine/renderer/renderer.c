@@ -18,6 +18,7 @@ b8 rendererCreate(rendererBackendAPI api, rendererBackend* rb) {
         rb->shutdown = vulkanShutdown;
 
         rb->draw = vulkanDraw;
+        rb->onResize = vulkanOnResize;
         rb->beginFrame = vulkanBeginFrame;
         rb->endFrame = vulkanEndFrame;
         rb->beginRenderpass = vulkanBeginRenderpass;
@@ -112,6 +113,10 @@ b8 rendererDraw(renderInfo* ri){
         systemPtr->rb.frameNum++;
     }
     return true;
+}
+
+b8 rendererOnResized(u16 width, u16 height){
+    return systemPtr->rb.onResize(width, height);
 }
 
 b8 rendererShaderCreate(const ShaderRS* srs, Shader* outShader) {

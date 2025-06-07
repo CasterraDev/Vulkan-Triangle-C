@@ -3,6 +3,7 @@
 #include "core/logger.h"
 #include "device.h"
 #include "math/fsnmath.h"
+#include "renderer/vulkan/utils.h"
 #include "renderer/vulkan/vulkanTypes.h"
 #include "vulkan/vulkan_core.h"
 #include "vulkanSwapchain.h"
@@ -10,20 +11,20 @@
 b8 vulkanSwapchainCreate(VulkanInfo* header, u32 width, u32 height,
                          VulkanSwapchain* outSwapchain) {
 
-    VulkanSwapchainSupportInfo swapchainInfo = header->device.swapchainSupport;
+    VulkanSwapchainSupportInfo* swapchainInfo = &header->device.swapchainSupport;
 
-    VkSurfaceFormatKHR format = swapchainInfo.formats[0];
+    VkSurfaceFormatKHR format = swapchainInfo->formats[0];
     VkPresentModeKHR presentMode = VK_PRESENT_MODE_FIFO_KHR;
     VkExtent2D swapExtent = {width, height};
 
     // Get the format
-    for (u8 i = 0; i < swapchainInfo.formatCnt; i++) {
-        FDEBUG("Format: %d vs %d, Colorspace: %d vs %d", swapchainInfo.formats[i].format, VK_FORMAT_B8G8R8A8_UNORM,
-               swapchainInfo.formats[i].colorSpace, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR);
-        if (swapchainInfo.formats[i].format == VK_FORMAT_B8G8R8A8_UNORM &&
-            swapchainInfo.formats[i].colorSpace ==
+    for (u8 i = 0; i < swapchainInfo->formatCnt; i++) {
+        FDEBUG("Format: %d vs %d, Colorspace: %d vs %d", swapchainInfo->formats[i].format, VK_FORMAT_B8G8R8A8_UNORM,
+               swapchainInfo->formats[i].colorSpace, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR);
+        if (swapchainInfo->formats[i].format == VK_FORMAT_B8G8R8A8_UNORM &&
+            swapchainInfo->formats[i].colorSpace ==
                 VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
-            format = swapchainInfo.formats[i];
+            format = swapchainInfo->formats[i];
             FDEBUG("Swapchain format found: %d:%d", format.format,
                    format.colorSpace);
             break;
@@ -32,10 +33,10 @@ b8 vulkanSwapchainCreate(VulkanInfo* header, u32 width, u32 height,
     outSwapchain->imgFormat = format;
 
     // Get present mode
-    for (u8 i = 0; i < swapchainInfo.presentModeCnt; i++) {
-        FDEBUG("PresentMode: %d vs %d", swapchainInfo.presentModes[i], VK_PRESENT_MODE_MAILBOX_KHR);
-        if (swapchainInfo.presentModes[i] == VK_PRESENT_MODE_MAILBOX_KHR) {
-            presentMode = swapchainInfo.presentModes[i];
+    for (u8 i = 0; i < swapchainInfo->presentModeCnt; i++) {
+        FDEBUG("PresentMode: %d vs %d", swapchainInfo->presentModes[i], VK_PRESENT_MODE_MAILBOX_KHR);
+        if (swapchainInfo->presentModes[i] == VK_PRESENT_MODE_MAILBOX_KHR) {
+            presentMode = swapchainInfo->presentModes[i];
             FDEBUG("Swapchain present mode found: %d", presentMode);
             break;
         }
@@ -45,18 +46,18 @@ b8 vulkanSwapchainCreate(VulkanInfo* header, u32 width, u32 height,
                                       header->surface,
                                       &header->device.swapchainSupport);
 
-    if (swapchainInfo.capabilities.currentExtent.width != UINT32_MAX) {
-        swapExtent = swapchainInfo.capabilities.currentExtent;
-    } else {
+    if (swapchainInfo->capabilities.currentExtent.width != UINT32_MAX) {
+        swapExtent = swapchainInfo->capabilities.currentExtent;
+    }else{
         swapExtent.width = FCLAMP(
-            swapExtent.width, swapchainInfo.capabilities.minImageExtent.width,
-            swapchainInfo.capabilities.maxImageExtent.width);
+                swapExtent.width, swapchainInfo->capabilities.minImageExtent.width,
+                swapchainInfo->capabilities.maxImageExtent.width);
         swapExtent.height = FCLAMP(
-            swapExtent.height, swapchainInfo.capabilities.minImageExtent.height,
-            swapchainInfo.capabilities.maxImageExtent.height);
+                swapExtent.height, swapchainInfo->capabilities.minImageExtent.height,
+                swapchainInfo->capabilities.maxImageExtent.height);
     }
 
-    u32 imageCnt = swapchainInfo.capabilities.minImageCount;
+    u32 imageCnt = swapchainInfo->capabilities.minImageCount;
 
     // TODO: Look into this. Present me doesn't know why past me wrote it 
     // if (swapchainInfo.capabilities.maxImageCount > 0 &&
@@ -89,14 +90,19 @@ b8 vulkanSwapchainCreate(VulkanInfo* header, u32 width, u32 height,
         swapCI.pQueueFamilyIndices = 0;
     }
 
-    swapCI.preTransform = swapchainInfo.capabilities.currentTransform;
+    swapCI.preTransform = swapchainInfo->capabilities.currentTransform;
     swapCI.presentMode = presentMode;
     swapCI.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
     swapCI.clipped = VK_TRUE;
     swapCI.oldSwapchain = 0;
+    swapCI.pNext = 0;
+    swapCI.flags = 0;
 
-    VK_CHECK(vkCreateSwapchainKHR(header->device.device, &swapCI,
-                                  header->allocator, &outSwapchain->handle))
+    VkResult csres = vkCreateSwapchainKHR(header->device.device, &swapCI,
+                                  header->allocator, &outSwapchain->handle);
+    if (!successfullVulkanResult(csres)){
+        FERROR("Error creating swapchain: %s", vulkanResultStr(csres, true));
+    }
 
     header->curImageIdx = 0;
 
@@ -114,6 +120,9 @@ b8 vulkanSwapchainCreate(VulkanInfo* header, u32 width, u32 height,
         outSwapchain->views = (VkImageView*)fallocate(
             sizeof(VkImageView) * outSwapchain->imageCnt, MEMORY_TAG_RENDERER);
     }
+
+    fzeroMemory(outSwapchain->images, sizeof(VkImage) * outSwapchain->imageCnt);
+    fzeroMemory(outSwapchain->views, sizeof(VkImageView) * outSwapchain->imageCnt);
 
     VK_CHECK(
         vkGetSwapchainImagesKHR(header->device.device, outSwapchain->handle,
@@ -149,7 +158,9 @@ b8 vulkanSwapchainRecreate(VulkanInfo* header, u32 width, u32 height,
                            VulkanSwapchain* swapchain) {
     // TODO: Make this function actually return false if it fails
     vulkanSwapchainDestroy(header, swapchain);
-    vulkanSwapchainCreate(header, width, height, swapchain);
+    if (!vulkanSwapchainCreate(header, width, height, swapchain)){
+        return false;
+    }
     return true;
 }
 
