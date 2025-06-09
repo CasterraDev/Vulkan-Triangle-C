@@ -2,6 +2,7 @@
 
 #include "core/asserts.h"
 #include "defines.h"
+#include "helpers/freelist.h"
 #include "math/matrixMath.h"
 #include "vulkan/vulkan_core.h"
 
@@ -44,6 +45,20 @@ typedef struct vulkanRenderpass {
 
     VulkanRenderpassState state;
 } VulkanRenderpass;
+
+typedef struct VulkanBuffer {
+    VkBuffer handle;
+    VkDeviceMemory bufferMemory;
+    u64 bufferSize;
+    VkMemoryRequirements memRequirements;
+    VkMemoryPropertyFlags memProperties;
+    VkBufferUsageFlagBits usageFlags;
+
+    b8 usesFreelist;
+    u64 freelistReqMem;
+    void* freelistMemory;
+    freelist bufferFreelist;
+} VulkanBuffer;
 
 typedef struct VulkanSwapchain {
     VkSurfaceFormatKHR imgFormat;

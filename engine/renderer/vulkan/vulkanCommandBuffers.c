@@ -16,10 +16,10 @@ void vulkanCommandBufferAllocate(VulkanInfo* vi, VkCommandPool comPool, b8 isPri
         outCommandBuffer->state = COMMAND_BUFFER_STATE_READY;
 }
 
-void vulkanCommandBufferBegin(VulkanCommandBuffer* commandBuffer){
+void vulkanCommandBufferBegin(VulkanCommandBuffer* commandBuffer, VkCommandBufferUsageFlags usageFlags){
     VkCommandBufferBeginInfo begin;
     begin.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    begin.flags = 0;
+    begin.flags = usageFlags;
     begin.pInheritanceInfo = 0;
     begin.pNext = 0;
 
@@ -39,3 +39,5 @@ void vulkanCommandBufferReset(VulkanCommandBuffer* commandBuffer){
 void vulkanCommandBufferUpdateSubmitted(VulkanCommandBuffer* commandBuffer){
     commandBuffer->state = COMMAND_BUFFER_STATE_SUBMITTED;
 }
+
+// TODO: vulkanCommandBufferFree(...)
