@@ -102,6 +102,7 @@ b8 vulkanBufferCopy(VulkanInfo* vi, VkCommandPool cp, VkQueue queue,
     si.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
     si.commandBufferCount = 1;
     si.pCommandBuffers = &vcb.handle;
+    si.pNext = 0;
 
     vkQueueSubmit(queue, 1, &si, fence);
     vkQueueWaitIdle(queue);

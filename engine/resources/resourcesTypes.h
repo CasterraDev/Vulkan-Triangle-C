@@ -26,7 +26,7 @@ typedef struct Resource {
 } Resource;
 
 typedef struct Vertex {
-    vector2 position;
+    vector3 position;
     vector3 color;
 } Vertex;
 

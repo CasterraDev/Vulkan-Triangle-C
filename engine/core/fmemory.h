@@ -7,23 +7,13 @@
     TAG(MEMORY_TAG_UNKNOWN)                                                    \
     TAG(MEMORY_TAG_ARRAY)                                                      \
     TAG(MEMORY_TAG_DINO)                                                       \
-    TAG(MEMORY_TAG_DICT)                                                       \
-    TAG(MEMORY_TAG_RING_QUEUE)                                                 \
-    TAG(MEMORY_TAG_BST)                                                        \
     TAG(MEMORY_TAG_STRING)                                                     \
     TAG(MEMORY_TAG_APPLICATION)                                                \
-    TAG(MEMORY_TAG_JOB)                                                        \
     TAG(MEMORY_TAG_TEXTURE)                                                    \
-    TAG(MEMORY_TAG_MATERIAL_INSTANCE)                                          \
     TAG(MEMORY_TAG_ALLOCATORS)                                                 \
     TAG(MEMORY_TAG_FILE_DATA)                                                  \
     TAG(MEMORY_TAG_RENDERER)                                                   \
     TAG(MEMORY_TAG_RESOURCE)                                                   \
-    TAG(MEMORY_TAG_GAME)                                                       \
-    TAG(MEMORY_TAG_TRANSFORM)                                                  \
-    TAG(MEMORY_TAG_ENTITY)                                                     \
-    TAG(MEMORY_TAG_ENTITY_NODE)                                                \
-    TAG(MEMORY_TAG_SCENE)                                                      \
     TAG(MEMORY_TAG_MAX_TAGS)
 
 #define GENERATE_ENUM(ENUM) ENUM,

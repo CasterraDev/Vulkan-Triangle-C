@@ -56,6 +56,32 @@ VkResult createDebugUtilsMessengerEXT(
     }
 }
 
+b8 insertDataViaStagingBuffer(VulkanInfo* vi, VkCommandPool cp, VkFence fence,
+                              VkQueue queue, VulkanBuffer* buffer, u64 size,
+                              u64* outOffset, void* data) {
+    if (!vulkanBufferAllocate(buffer, size, outOffset)) {
+        FERROR("Failed to insert data into buffer");
+        return false;
+    }
+
+    VulkanBuffer staging;
+    vulkanBufferCreate(vi, size, false, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                       VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                           VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                       &staging);
+    vulkanBufferBind(vi->device.device, &staging, 0);
+
+    void* d = vulkanBufferMapMem(vi->device.device, 0, size, 0, &staging);
+    fcopyMemory(d, data, size);
+    vulkanBufferUnmapMem(vi->device.device, &staging);
+
+    vulkanBufferCopy(vi, cp, queue, fence, &staging, 0, size, buffer,
+                     *outOffset);
+
+    vulkanBufferDestroy(vi, &staging);
+    return true;
+}
+
 b8 vulkanInit(rendererBackend* backend, const char* appName, u64 appWidth,
               u64 appHeight) {
     VkApplicationInfo vkheaderInfo = {
@@ -281,30 +307,31 @@ b8 vulkanInit(rendererBackend* backend, const char* appName, u64 appWidth,
     header.framebufferHeight = appHeight;
 
     Vertex vertices[3];
-    vertices[0].position = (vector2){0.0f, -0.5f};
-    vertices[1].position = (vector2){0.5f, 0.5f};
-    vertices[2].position = (vector2){-0.5f, 0.5f};
+    vertices[0].position = (vector3){0.0f, -0.5f, 0.0f};
+    vertices[1].position = (vector3){0.5f, 0.5f, 0.0f};
+    vertices[2].position = (vector3){-0.5f, 0.5f, 0.0f};
     // vertices[3].position = (vector2){10.0f, 0.0f};
 
     // Counter Clockwise
     u32 indices[6] = {2, 1, 0, 3, 0, 1};
 
-    vulkanBufferCreate(&header, sizeof(vertices[0]) * 3, false,
+    vulkanBufferCreate(&header, sizeof(Vertex) * 1024, true,
                        VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
                            VK_BUFFER_USAGE_TRANSFER_DST_BIT |
                            VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                       VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                           VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                           VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
                        &header.vertexBuffer);
 
     vulkanBufferBind(header.device.device, &header.vertexBuffer, 0);
 
-    void* data = vulkanBufferMapMem(header.device.device, 0,
-                                    header.vertexBuffer.bufferSize, 0,
-                                    &header.vertexBuffer);
-    vulkanBufferInsertData(data, &vertices, header.vertexBuffer.bufferSize);
-    vulkanBufferUnmapMem(header.device.device, &header.vertexBuffer);
-
+    u64 vertexOffset;
+    if (!insertDataViaStagingBuffer(
+        &header, header.device.graphicsCommandPool, 0,
+        header.device.graphicsQueue, &header.vertexBuffer,
+        sizeof(vertices[0]) * 3, &vertexOffset, vertices)){
+        FERROR("Failed to insert Data");
+        return false;
+    }
 
     if (!vulkanShaderInit(&header)) {
         FERROR("Failed to init shader");
@@ -322,8 +349,7 @@ void vulkanShutdown(rendererBackend* backend) {
 
     vulkanShaderShutdown(&header);
 
-    vkDestroyBuffer(header.device.device, header.vertexBuffer.handle, header.allocator);
-    vkFreeMemory(header.device.device, header.vertexBuffer.bufferMemory, header.allocator);
+    vulkanBufferDestroy(&header, &header.vertexBuffer);
 
     for (u32 i = 0; i < header.swapchain.imageCnt; i++) {
         vkDestroySemaphore(header.device.device,
@@ -373,8 +399,8 @@ b8 vulkanDraw() {
         header.graphicsCommandBuffers[header.curImageIdx].handle, 0, 1,
         vertexBuffers, offsets);
 
-    vkCmdDraw(header.graphicsCommandBuffers[header.curImageIdx].handle, header.vertexBuffer.bufferSize, 1, 0,
-              0);
+    vkCmdDraw(header.graphicsCommandBuffers[header.curImageIdx].handle,
+              header.vertexBuffer.bufferSize, 1, 0, 0);
 
     return true;
 }
