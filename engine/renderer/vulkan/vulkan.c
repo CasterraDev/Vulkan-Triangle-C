@@ -306,14 +306,13 @@ b8 vulkanInit(rendererBackend* backend, const char* appName, u64 appWidth,
     header.framebufferWidth = appWidth;
     header.framebufferHeight = appHeight;
 
-    Vertex vertices[3];
-    vertices[0].position = (vector3){0.0f, -0.5f, 0.0f};
-    vertices[1].position = (vector3){0.5f, 0.5f, 0.0f};
-    vertices[2].position = (vector3){-0.5f, 0.5f, 0.0f};
-    // vertices[3].position = (vector2){10.0f, 0.0f};
+    Vertex vertices[4];
+    vertices[0].position = (vector3){-0.5f, -0.5f, 0.0f};
+    vertices[1].position = (vector3){0.5f, -0.5f, 0.0f};
+    vertices[2].position = (vector3){0.5f, 0.5f, 0.0f};
+    vertices[3].position = (vector3){-0.5f, 0.5f, 0.0f};
 
-    // Counter Clockwise
-    u32 indices[6] = {2, 1, 0, 3, 0, 1};
+    u16 indices[6] = {0, 1, 2, 2, 3, 0};
 
     vulkanBufferCreate(&header, sizeof(Vertex) * 1024, true,
                        VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
@@ -328,7 +327,25 @@ b8 vulkanInit(rendererBackend* backend, const char* appName, u64 appWidth,
     if (!insertDataViaStagingBuffer(
         &header, header.device.graphicsCommandPool, 0,
         header.device.graphicsQueue, &header.vertexBuffer,
-        sizeof(vertices[0]) * 3, &vertexOffset, vertices)){
+        sizeof(vertices[0]) * 4, &vertexOffset, vertices)){
+        FERROR("Failed to insert Data");
+        return false;
+    }
+
+    vulkanBufferCreate(&header, sizeof(u16) * 1024, true,
+                       VK_BUFFER_USAGE_INDEX_BUFFER_BIT |
+                           VK_BUFFER_USAGE_TRANSFER_DST_BIT |
+                           VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                           VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+                       &header.indicesBuffer);
+
+    vulkanBufferBind(header.device.device, &header.indicesBuffer, 0);
+
+    u64 indicesOffset;
+    if (!insertDataViaStagingBuffer(
+        &header, header.device.graphicsCommandPool, 0,
+        header.device.graphicsQueue, &header.indicesBuffer,
+        sizeof(indices[0]) * 6, &indicesOffset, indices)){
         FERROR("Failed to insert Data");
         return false;
     }
@@ -350,6 +367,7 @@ void vulkanShutdown(rendererBackend* backend) {
     vulkanShaderShutdown(&header);
 
     vulkanBufferDestroy(&header, &header.vertexBuffer);
+    vulkanBufferDestroy(&header, &header.indicesBuffer);
 
     for (u32 i = 0; i < header.swapchain.imageCnt; i++) {
         vkDestroySemaphore(header.device.device,
@@ -399,8 +417,11 @@ b8 vulkanDraw() {
         header.graphicsCommandBuffers[header.curImageIdx].handle, 0, 1,
         vertexBuffers, offsets);
 
-    vkCmdDraw(header.graphicsCommandBuffers[header.curImageIdx].handle,
-              header.vertexBuffer.bufferSize, 1, 0, 0);
+    vkCmdBindIndexBuffer(header.graphicsCommandBuffers[header.curImageIdx].handle, header.indicesBuffer.handle, 0, VK_INDEX_TYPE_UINT16);
+
+    vkCmdDrawIndexed(header.graphicsCommandBuffers[header.curImageIdx].handle, 6, 1, 0, 0, 0);
+    // vkCmdDraw(header.graphicsCommandBuffers[header.curImageIdx].handle,
+    //           header.vertexBuffer.bufferSize, 1, 0, 0);
 
     return true;
 }
