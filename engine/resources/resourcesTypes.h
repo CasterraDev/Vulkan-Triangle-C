@@ -1,6 +1,7 @@
 #pragma once
 
 #include "defines.h"
+#include "math/matrixMath.h"
 
 #define FILENAME_MAX_LENGTH 256
 #define MATERIAL_MAX_LENGTH 256
@@ -24,6 +25,11 @@ typedef struct Resource {
     void* data;
 } Resource;
 
+typedef struct Vertex {
+    vector3 position;
+    vector3 color;
+} Vertex;
+
 /** @brief Shader stages available. */
 typedef enum ShaderStage {
     SHADER_STAGE_VERTEX = 0x00000001,
@@ -34,17 +40,16 @@ typedef enum ShaderStage {
 
 /** @brief Available attribute types. */
 typedef enum ShaderAttributeType {
-    SHADER_ATTRIB_TYPE_FLOAT32 = 0U,
-    SHADER_ATTRIB_TYPE_FLOAT32_2 = 1U,
-    SHADER_ATTRIB_TYPE_FLOAT32_3 = 2U,
-    SHADER_ATTRIB_TYPE_FLOAT32_4 = 3U,
-    SHADER_ATTRIB_TYPE_MATRIX_4 = 4U,
-    SHADER_ATTRIB_TYPE_INT8 = 5U,
-    SHADER_ATTRIB_TYPE_UINT8 = 6U,
-    SHADER_ATTRIB_TYPE_INT16 = 7U,
-    SHADER_ATTRIB_TYPE_UINT16 = 8U,
-    SHADER_ATTRIB_TYPE_INT32 = 9U,
-    SHADER_ATTRIB_TYPE_UINT32 = 10U,
+    SHADER_ATTRIBUTE_TYPE_FLOAT32 = 0U,
+    SHADER_ATTRIBUTE_TYPE_FLOAT32_2 = 1U,
+    SHADER_ATTRIBUTE_TYPE_FLOAT32_3 = 2U,
+    SHADER_ATTRIBUTE_TYPE_FLOAT32_4 = 3U,
+    SHADER_ATTRIBUTE_TYPE_INT8 = 5U,
+    SHADER_ATTRIBUTE_TYPE_UINT8 = 6U,
+    SHADER_ATTRIBUTE_TYPE_INT16 = 7U,
+    SHADER_ATTRIBUTE_TYPE_UINT16 = 8U,
+    SHADER_ATTRIBUTE_TYPE_INT32 = 9U,
+    SHADER_ATTRIBUTE_TYPE_UINT32 = 10U,
 } ShaderAttributeType;
 
 /** @brief Available uniform types. */
@@ -105,8 +110,8 @@ typedef struct ShaderUniformConfig {
 
 typedef struct ShaderRS {
     char* name;
-    b8 hasInstances;
-    b8 hasLocals;
+    b8 supportsInstances;
+    b8 supportsLocals;
 
     u8 stageCnt;
     ShaderStage* stages;

@@ -6,6 +6,7 @@
 #include "renderer/renderTypes.h"
 #include "renderer/vulkan/device.h"
 #include "renderer/vulkan/utils.h"
+#include "renderer/vulkan/vulkanBuffer.h"
 #include "renderer/vulkan/vulkanCommandBuffers.h"
 #include "renderer/vulkan/vulkanPlatform.h"
 #include "renderer/vulkan/vulkanRenderpass.h"
@@ -53,6 +54,32 @@ VkResult createDebugUtilsMessengerEXT(
     } else {
         return VK_ERROR_EXTENSION_NOT_PRESENT;
     }
+}
+
+b8 insertDataViaStagingBuffer(VulkanInfo* vi, VkCommandPool cp, VkFence fence,
+                              VkQueue queue, VulkanBuffer* buffer, u64 size,
+                              u64* outOffset, void* data) {
+    if (!vulkanBufferAllocate(buffer, size, outOffset)) {
+        FERROR("Failed to insert data into buffer");
+        return false;
+    }
+
+    VulkanBuffer staging;
+    vulkanBufferCreate(vi, size, false, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                       VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                           VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                       &staging);
+    vulkanBufferBind(vi->device.device, &staging, 0);
+
+    void* d = vulkanBufferMapMem(vi->device.device, 0, size, 0, &staging);
+    fcopyMemory(d, data, size);
+    vulkanBufferUnmapMem(vi->device.device, &staging);
+
+    vulkanBufferCopy(vi, cp, queue, fence, &staging, 0, size, buffer,
+                     *outOffset);
+
+    vulkanBufferDestroy(vi, &staging);
+    return true;
 }
 
 b8 vulkanInit(rendererBackend* backend, const char* appName, u64 appWidth,
@@ -279,6 +306,50 @@ b8 vulkanInit(rendererBackend* backend, const char* appName, u64 appWidth,
     header.framebufferWidth = appWidth;
     header.framebufferHeight = appHeight;
 
+    Vertex vertices[4];
+    vertices[0].position = (vector3){-0.5f, -0.5f, 0.0f};
+    vertices[1].position = (vector3){0.5f, -0.5f, 0.0f};
+    vertices[2].position = (vector3){0.5f, 0.5f, 0.0f};
+    vertices[3].position = (vector3){-0.5f, 0.5f, 0.0f};
+
+    u16 indices[6] = {0, 1, 2, 2, 3, 0};
+
+    vulkanBufferCreate(&header, sizeof(Vertex) * 1024, true,
+                       VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
+                           VK_BUFFER_USAGE_TRANSFER_DST_BIT |
+                           VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                           VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+                       &header.vertexBuffer);
+
+    vulkanBufferBind(header.device.device, &header.vertexBuffer, 0);
+
+    u64 vertexOffset;
+    if (!insertDataViaStagingBuffer(
+        &header, header.device.graphicsCommandPool, 0,
+        header.device.graphicsQueue, &header.vertexBuffer,
+        sizeof(vertices[0]) * 4, &vertexOffset, vertices)){
+        FERROR("Failed to insert Data");
+        return false;
+    }
+
+    vulkanBufferCreate(&header, sizeof(u16) * 1024, true,
+                       VK_BUFFER_USAGE_INDEX_BUFFER_BIT |
+                           VK_BUFFER_USAGE_TRANSFER_DST_BIT |
+                           VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                           VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+                       &header.indicesBuffer);
+
+    vulkanBufferBind(header.device.device, &header.indicesBuffer, 0);
+
+    u64 indicesOffset;
+    if (!insertDataViaStagingBuffer(
+        &header, header.device.graphicsCommandPool, 0,
+        header.device.graphicsQueue, &header.indicesBuffer,
+        sizeof(indices[0]) * 6, &indicesOffset, indices)){
+        FERROR("Failed to insert Data");
+        return false;
+    }
+
     if (!vulkanShaderInit(&header)) {
         FERROR("Failed to init shader");
         return false;
@@ -294,6 +365,9 @@ void vulkanShutdown(rendererBackend* backend) {
     vkDeviceWaitIdle(header.device.device);
 
     vulkanShaderShutdown(&header);
+
+    vulkanBufferDestroy(&header, &header.vertexBuffer);
+    vulkanBufferDestroy(&header, &header.indicesBuffer);
 
     for (u32 i = 0; i < header.swapchain.imageCnt; i++) {
         vkDestroySemaphore(header.device.device,
@@ -337,14 +411,22 @@ void vulkanShutdown(rendererBackend* backend) {
 }
 
 b8 vulkanDraw() {
+    VkBuffer vertexBuffers[] = {header.vertexBuffer.handle};
+    VkDeviceSize offsets[] = {0};
+    vkCmdBindVertexBuffers(
+        header.graphicsCommandBuffers[header.curImageIdx].handle, 0, 1,
+        vertexBuffers, offsets);
 
-    vkCmdDraw(header.graphicsCommandBuffers[header.curImageIdx].handle, 3, 1, 0,
-              0);
+    vkCmdBindIndexBuffer(header.graphicsCommandBuffers[header.curImageIdx].handle, header.indicesBuffer.handle, 0, VK_INDEX_TYPE_UINT16);
+
+    vkCmdDrawIndexed(header.graphicsCommandBuffers[header.curImageIdx].handle, 6, 1, 0, 0, 0);
+    // vkCmdDraw(header.graphicsCommandBuffers[header.curImageIdx].handle,
+    //           header.vertexBuffer.bufferSize, 1, 0, 0);
 
     return true;
 }
 
-b8 vulkanOnResize(u16 width, u16 height){
+b8 vulkanOnResize(u16 width, u16 height) {
     header.framebufferWidth = width;
     header.framebufferHeight = height;
     header.framebufferSizeGen++;
@@ -454,7 +536,7 @@ b8 vulkanBeginFrame(struct rendererBackend* backend, f32 deltaTime) {
     VulkanCommandBuffer* cb =
         &header.graphicsCommandBuffers[header.curImageIdx];
     vulkanCommandBufferReset(cb);
-    vulkanCommandBufferBegin(cb);
+    vulkanCommandBufferBegin(cb, 0);
 
     // Set viewport/scissor
 

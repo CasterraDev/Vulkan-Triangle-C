@@ -172,4 +172,9 @@ typedef struct VulkanInfo {
     b8 recreatingSwapchain;
     u32 framebufferSizeGen;
     u32 framebufferSizeGenLast;
+
+    // Temp
+    VulkanBuffer vertexBuffer;
+    VulkanBuffer indicesBuffer;
+    // End Temp
 } VulkanInfo;

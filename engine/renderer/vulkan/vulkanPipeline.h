@@ -12,6 +12,7 @@ typedef struct VulkanPipelineConfig {
     VkRect2D scissor;
     b8 isWireframe;
     b8 depthTested;
+    VkVertexInputAttributeDescription* attributes;
 } VulkanPipelineConfig;
 
 b8 vulkanPipelineCreate(VulkanInfo* vi, VulkanPipelineConfig vpc, VulkanPipeline* outPipeline);

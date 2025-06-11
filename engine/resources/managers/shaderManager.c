@@ -26,11 +26,14 @@ b8 shaderManagerLoad(resourceManager* self, const char* name,
     r->stages = dinoCreate(ShaderStage);
     r->stageCnt = 0;
 
-    r->hasInstances = 0;
-    r->hasLocals = 0;
+    r->supportsInstances = 0;
+    r->supportsLocals = 0;
     r->stageNames = dinoCreate(char*);
     r->stageFiles = dinoCreate(char*);
     r->renderpassName = 0;
+
+    b8 attributeStarted = false;
+    b8 uniformStarted = false;
 
     char line[512] = "";
     char* p = &line[0];
@@ -44,8 +47,16 @@ b8 shaderManagerLoad(resourceManager* self, const char* name,
         }
 
         i32 equalIdx = strIdxOf(ln, '=');
-        if (equalIdx == -1) {
-            FERROR("Formating error in %s. Skipping Line.", fileLocation);
+        if (equalIdx == -1 && !uniformStarted && !attributeStarted) {
+            if (strEqualI(ln, "UNIFORMS")){
+                uniformStarted = true;
+                attributeStarted = false;
+            }else if (strEqualI(ln, "ATTRIBUTES")){
+                uniformStarted = false;
+                attributeStarted = true;
+            }else{
+                FERROR("Formating error in %s. No '=' Found, Skipping Line.", fileLocation);
+            }
             continue;
         }
 
@@ -78,137 +89,154 @@ b8 shaderManagerLoad(resourceManager* self, const char* name,
             }
         } else if (strEqualI(tvar, "stagefiles")) {
             r->stageCnt = strSplit(tval, ',', &r->stageFiles, true, true);
-        } else if (strEqualI(tvar, "hasInstances")) {
-            strToBool(tval, &r->hasInstances);
-        } else if (strEqualI(tvar, "hasLocals")) {
-            strToBool(tval, &r->hasLocals);
-        } else if (strEqualI(tvar, "attribute")) {
-            char** fields = dinoCreate(char*);
-            u32 fieldAmt = strSplit(tval, ',', &fields, true, true);
-            if (fieldAmt != 2) {
-                FERROR("ShaderCfg %s: Incorrect attribute syntax", r->name);
-                continue;
-            }
-            ShaderAttributeConfig at;
-            // Parse field type
-            if (strEqualI(fields[0], "f32")) {
-                at.type = SHADER_ATTRIB_TYPE_FLOAT32;
-                at.size = 4;
-            } else if (strEqualI(fields[0], "vec2")) {
-                at.type = SHADER_ATTRIB_TYPE_FLOAT32_2;
-                at.size = 8;
-            } else if (strEqualI(fields[0], "vec3")) {
-                at.type = SHADER_ATTRIB_TYPE_FLOAT32_3;
-                at.size = 12;
-            } else if (strEqualI(fields[0], "vec4")) {
-                at.type = SHADER_ATTRIB_TYPE_FLOAT32_4;
-                at.size = 16;
-            } else if (strEqualI(fields[0], "u8")) {
-                at.type = SHADER_ATTRIB_TYPE_UINT8;
-                at.size = 1;
-            } else if (strEqualI(fields[0], "u16")) {
-                at.type = SHADER_ATTRIB_TYPE_UINT16;
-                at.size = 2;
-            } else if (strEqualI(fields[0], "u32")) {
-                at.type = SHADER_ATTRIB_TYPE_UINT32;
-                at.size = 4;
-            } else if (strEqualI(fields[0], "i8")) {
-                at.type = SHADER_ATTRIB_TYPE_INT8;
-                at.size = 1;
-            } else if (strEqualI(fields[0], "i16")) {
-                at.type = SHADER_ATTRIB_TYPE_INT16;
-                at.size = 2;
-            } else if (strEqualI(fields[0], "i32")) {
-                at.type = SHADER_ATTRIB_TYPE_INT32;
-                at.size = 4;
-            } else {
-                FERROR("ShaderCfg %s: Invalid attribute type used.", r->name);
-                FWARN("Defaulting to f32.");
-                at.type = SHADER_ATTRIB_TYPE_FLOAT32;
-                at.size = 4;
-            }
-            at.name = strDup(fields[1]);
-            at.nameLen = strLen(fields[1]);
-            dinoPush(r->attributes, at);
-            r->attributeCnt++;
+        } else if (strEqualI(tvar, "supportsInstances")) {
+            strToBool(tval, &r->supportsInstances);
+        } else if (strEqualI(tvar, "supportsLocals")) {
+            strToBool(tval, &r->supportsLocals);
+        } else if (strEqualI(tvar, "ATTRIBUTES")) {
+            attributeStarted = true;
+            uniformStarted = false;
+        } else if (strEqualI(tvar, "UNIFORMS")) {
+            attributeStarted = false;
+            uniformStarted = true;
+        } else {
+            if (attributeStarted) {
+                if (!r->attributes){
+                    r->attributes = dinoCreate(ShaderAttributeConfig);
+                }
+                char** fields = dinoCreate(char*);
+                u32 fieldAmt = strSplit(tval, ' ', &fields, true, true);
+                if (fieldAmt != 2) {
+                    FERROR("ShaderCfg %s: Incorrect attribute syntax", r->name);
+                    continue;
+                }
+                ShaderAttributeConfig at;
 
-            strCleanDinoArray(fields);
-            dinoDestroy(fields);
-        } else if (strEqualI(tvar, "uniform")) {
-            char** fields = dinoCreate(char*);
-            u32 fieldAmt = strSplit(tval, ',', &fields, true, true);
-            if (fieldAmt != 3) {
-                FERROR("ShaderCfg %s: Incorrect uniform syntax", r->name);
-                continue;
-            }
-            ShaderUniformConfig un;
-            // Parse field type
-            if (strEqualI(fields[0], "f32")) {
-                un.type = SHADER_UNIFORM_TYPE_FLOAT32;
-                un.size = 4;
-            } else if (strEqualI(fields[0], "vec2")) {
-                un.type = SHADER_UNIFORM_TYPE_FLOAT32_2;
-                un.size = 8;
-            } else if (strEqualI(fields[0], "vec3")) {
-                un.type = SHADER_UNIFORM_TYPE_FLOAT32_3;
-                un.size = 12;
-            } else if (strEqualI(fields[0], "vec4")) {
-                un.type = SHADER_UNIFORM_TYPE_FLOAT32_4;
-                un.size = 16;
-            } else if (strEqualI(fields[0], "u8")) {
-                un.type = SHADER_UNIFORM_TYPE_UINT8;
-                un.size = 1;
-            } else if (strEqualI(fields[0], "u16")) {
-                un.type = SHADER_UNIFORM_TYPE_UINT16;
-                un.size = 2;
-            } else if (strEqualI(fields[0], "u32")) {
-                un.type = SHADER_UNIFORM_TYPE_UINT32;
-                un.size = 4;
-            } else if (strEqualI(fields[0], "i8")) {
-                un.type = SHADER_UNIFORM_TYPE_INT8;
-                un.size = 1;
-            } else if (strEqualI(fields[0], "i16")) {
-                un.type = SHADER_UNIFORM_TYPE_INT16;
-                un.size = 2;
-            } else if (strEqualI(fields[0], "i32")) {
-                un.type = SHADER_UNIFORM_TYPE_INT32;
-                un.size = 4;
-            } else if (strEqualI(fields[0], "mat4")) {
-                un.type = SHADER_UNIFORM_TYPE_MATRIX_4;
-                un.size = 64;
-            } else if (strEqualI(fields[0], "sampler") ||
-                       strEqualI(fields[0], "samp")) {
-                un.type = SHADER_UNIFORM_TYPE_SAMPLER;
-                un.size = 0;
-                FINFO("Sampler read");
-            } else {
-                FERROR("ShaderCfg %s: Invalid uniform type used. %s", r->name,
-                       fields[0]);
-                FWARN("Defaulting to f32.");
-                un.type = SHADER_UNIFORM_TYPE_FLOAT32;
-                un.size = 4;
-            }
+                at.name = strDup(fields[0]);
+                at.nameLen = strLen(fields[0]);
 
-            if (strEqualI(fields[1], "0")) {
-                un.scope = SHADER_SCOPE_GLOBAL;
-            } else if (strEqualI(fields[1], "1")) {
-                un.scope = SHADER_SCOPE_INSTANCE;
-            } else if (strEqualI(fields[1], "2")) {
-                un.scope = SHADER_SCOPE_LOCAL;
+                // Parse field type
+                if (strEqualI(fields[1], "i8")) {
+                    at.type = SHADER_ATTRIBUTE_TYPE_INT8;
+                    at.size = 1;
+                } else if (strEqualI(fields[1], "i16")) {
+                    at.type = SHADER_ATTRIBUTE_TYPE_INT16;
+                    at.size = 2;
+                } else if (strEqualI(fields[1], "i32")) {
+                    at.type = SHADER_ATTRIBUTE_TYPE_INT32;
+                    at.size = 4;
+                } else if (strEqualI(fields[1], "u8")) {
+                    at.type = SHADER_ATTRIBUTE_TYPE_UINT8;
+                    at.size = 1;
+                } else if (strEqualI(fields[1], "u16")) {
+                    at.type = SHADER_ATTRIBUTE_TYPE_UINT16;
+                    at.size = 2;
+                } else if (strEqualI(fields[1], "u32")) {
+                    at.type = SHADER_ATTRIBUTE_TYPE_UINT32;
+                    at.size = 4;
+                } else if (strEqualI(fields[1], "f32")) {
+                    at.type = SHADER_ATTRIBUTE_TYPE_FLOAT32;
+                    at.size = 4;
+                } else if (strEqualI(fields[1], "vec2")) {
+                    at.type = SHADER_ATTRIBUTE_TYPE_FLOAT32_2;
+                    at.size = 8;
+                } else if (strEqualI(fields[1], "vec3")) {
+                    at.type = SHADER_ATTRIBUTE_TYPE_FLOAT32_3;
+                    at.size = 12;
+                } else if (strEqualI(fields[1], "vec4")) {
+                    at.type = SHADER_ATTRIBUTE_TYPE_FLOAT32_4;
+                    at.size = 16;
+                } else {
+                    FERROR("ShaderCfg %s: Invalid attribute type used.",
+                           r->name);
+                    FWARN("Defaulting to f32.");
+                    at.type = SHADER_ATTRIBUTE_TYPE_FLOAT32;
+                    at.size = 4;
+                }
+                dinoPush(r->attributes, at);
+                r->attributeCnt++;
+
+                strCleanDinoArray(fields);
+                dinoDestroy(fields);
+            } else if (uniformStarted) {
+                if (!r->uniforms){
+                    r->uniforms = dinoCreate(ShaderUniformConfig);
+                }
+                char** fields = dinoCreate(char*);
+                u32 fieldAmt = strSplit(tval, ' ', &fields, true, true);
+                if (fieldAmt != 3) {
+                    FERROR("ShaderCfg %s: Incorrect uniform syntax", r->name);
+                    continue;
+                }
+                ShaderUniformConfig un;
+                // Parse field type
+                un.name = strDup(fields[0]);
+                un.nameLen = strLen(fields[0]);
+
+                if (strEqualI(fields[1], "3")) {
+                    un.scope = SHADER_SCOPE_GLOBAL;
+                } else if (strEqualI(fields[1], "2")) {
+                    un.scope = SHADER_SCOPE_INSTANCE;
+                } else if (strEqualI(fields[1], "1")) {
+                    un.scope = SHADER_SCOPE_LOCAL;
+                }
+
+                if (strEqualI(fields[2], "i8")) {
+                    un.type = SHADER_UNIFORM_TYPE_INT8;
+                    un.size = 1;
+                } else if (strEqualI(fields[2], "i16")) {
+                    un.type = SHADER_UNIFORM_TYPE_INT16;
+                    un.size = 2;
+                } else if (strEqualI(fields[2], "i32")) {
+                    un.type = SHADER_UNIFORM_TYPE_INT32;
+                    un.size = 4;
+                } else if (strEqualI(fields[2], "u8")) {
+                    un.type = SHADER_UNIFORM_TYPE_UINT8;
+                    un.size = 1;
+                } else if (strEqualI(fields[2], "u16")) {
+                    un.type = SHADER_UNIFORM_TYPE_UINT16;
+                    un.size = 2;
+                } else if (strEqualI(fields[2], "u32")) {
+                    un.type = SHADER_UNIFORM_TYPE_UINT32;
+                    un.size = 4;
+                } else if (strEqualI(fields[2], "f32")) {
+                    un.type = SHADER_UNIFORM_TYPE_FLOAT32;
+                    un.size = 4;
+                } else if (strEqualI(fields[2], "vec2")) {
+                    un.type = SHADER_UNIFORM_TYPE_FLOAT32_2;
+                    un.size = 8;
+                } else if (strEqualI(fields[2], "vec3")) {
+                    un.type = SHADER_UNIFORM_TYPE_FLOAT32_3;
+                    un.size = 12;
+                } else if (strEqualI(fields[2], "vec4")) {
+                    un.type = SHADER_UNIFORM_TYPE_FLOAT32_4;
+                    un.size = 16;
+                } else if (strEqualI(fields[2], "mat4")) {
+                    un.type = SHADER_UNIFORM_TYPE_MATRIX_4;
+                    un.size = 64;
+                } else if (strEqualI(fields[2], "sampler") ||
+                           strEqualI(fields[2], "samp")) {
+                    un.type = SHADER_UNIFORM_TYPE_SAMPLER;
+                    un.size = 0;
+                    FINFO("Sampler read");
+                } else {
+                    FERROR("ShaderCfg %s: Invalid uniform type used. %s",
+                           r->name, fields[2]);
+                    FWARN("Defaulting to f32.");
+                    un.type = SHADER_UNIFORM_TYPE_FLOAT32;
+                    un.size = 4;
+                }
+
+                dinoPush(r->uniforms, un);
+                r->uniformCnt++;
+
+                strCleanDinoArray(fields);
+                dinoDestroy(fields);
             }
-
-            un.name = strDup(fields[2]);
-            un.nameLen = strLen(fields[2]);
-            dinoPush(r->uniforms, un);
-            r->uniformCnt++;
-
-            strCleanDinoArray(fields);
-            dinoDestroy(fields);
         }
         fzeroMemory(ln, sizeof(char) * 512);
     }
     fsClose(&f);
-    FDEBUG("StageCnt: %d", r->stageCnt);
     outResource->data = r;
     outResource->dataSize = sizeof(ShaderRS);
     return true;
@@ -221,7 +249,8 @@ void shaderManagerUnload(resourceManager* self, Resource* resource) {
           MEMORY_TAG_STRING);
     ffree(r->name, sizeof(char) * (strLen(r->name) + 1), MEMORY_TAG_STRING);
 
-    // Destroy stage Dinos. There filled with strings so use strCleanDinoArray
+    // Destroy stage Dinos. There filled with strings so use
+    // strCleanDinoArray
     strCleanDinoArray(r->stageFiles);
     strCleanDinoArray(r->stageNames);
     dinoDestroy(r->stageFiles);
