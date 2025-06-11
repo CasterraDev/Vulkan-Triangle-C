@@ -1,11 +1,14 @@
 #include "shaderSystem.h"
 #include "core/fmemory.h"
+#include "core/fstring.h"
 #include "core/logger.h"
 #include "defines.h"
+#include "helpers/dinoarray.h"
 #include "helpers/hashtable.h"
 #include "renderer/renderer.h"
 #include "resources/resourceManager.h"
 #include "resources/resourcesTypes.h"
+#include "vulkan/vulkan_core.h"
 
 typedef struct shaderSystemState {
     shaderSystemSettings settings;
@@ -87,10 +90,36 @@ b8 shaderCreate(const ShaderRS* srs, Shader* outShader) {
     // TODO: Some hardcoded
     outShader->name = srs->name;
     outShader->autoDelete = 1;
-    outShader->hasInstances = srs->hasInstances;
-    outShader->hasLocals = srs->hasLocals;
+    outShader->supportsInstances = srs->supportsInstances;
+    outShader->supportsLocals = srs->supportsLocals;
     outShader->id = shaderId;
     outShader->refCnt++;
+
+    // Attributes
+    ShaderAttribute* attDescs = dinoCreate(ShaderAttribute);
+    for (u32 i = 0; i < srs->attributeCnt; i++){
+        ShaderAttribute sa;
+        sa.size = srs->attributes[i].size;
+        sa.name = strDup(srs->attributes[i].name);
+        sa.type = srs->attributes[i].type;
+        dinoPush(attDescs, sa);
+    }
+
+    ShaderUniform* uniDescs = dinoCreate(ShaderUniform);
+    for (u32 i = 0; i < srs->uniformCnt; i++){
+        ShaderUniform su;
+        su.name = strDup(srs->uniforms[i].name);
+        su.uniformIdx = i;
+        su.scope = srs->uniforms[i].scope;
+        su.type = srs->uniforms[i].type;
+        if (su.scope == SHADER_SCOPE_LOCAL){
+
+        }else{
+            su.size = srs->uniforms[i].size;
+            su.offset = (su.scope == SHADER_SCOPE_GLOBAL) ? outShader->globalUboSize : outShader->uboSize;
+        }
+    }
+    
 
     FDEBUG("Create the render shader")
     if (!rendererShaderCreate(srs, outShader)) {
@@ -119,21 +148,21 @@ void shaderUse(Shader* s){
 
 u32 getAttributeSize(ShaderAttributeType t) {
     switch (t) {
-        case SHADER_ATTRIB_TYPE_INT8:
-        case SHADER_ATTRIB_TYPE_UINT8:
+        case SHADER_ATTRIBUTE_TYPE_INT8:
+        case SHADER_ATTRIBUTE_TYPE_UINT8:
             return 1;
-        case SHADER_ATTRIB_TYPE_INT16:
-        case SHADER_ATTRIB_TYPE_UINT16:
+        case SHADER_ATTRIBUTE_TYPE_INT16:
+        case SHADER_ATTRIBUTE_TYPE_UINT16:
             return 2;
-        case SHADER_ATTRIB_TYPE_FLOAT32:
-        case SHADER_ATTRIB_TYPE_INT32:
-        case SHADER_ATTRIB_TYPE_UINT32:
+        case SHADER_ATTRIBUTE_TYPE_FLOAT32:
+        case SHADER_ATTRIBUTE_TYPE_INT32:
+        case SHADER_ATTRIBUTE_TYPE_UINT32:
             return 4;
-        case SHADER_ATTRIB_TYPE_FLOAT32_2:
+        case SHADER_ATTRIBUTE_TYPE_FLOAT32_2:
             return 8;
-        case SHADER_ATTRIB_TYPE_FLOAT32_3:
+        case SHADER_ATTRIBUTE_TYPE_FLOAT32_3:
             return 12;
-        case SHADER_ATTRIB_TYPE_FLOAT32_4:
+        case SHADER_ATTRIBUTE_TYPE_FLOAT32_4:
             return 16;
         default:
             return 4;

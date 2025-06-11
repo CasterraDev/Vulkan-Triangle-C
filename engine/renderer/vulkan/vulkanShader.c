@@ -12,6 +12,7 @@
 static VulkanInfo* vss;
 
 VkShaderStageFlagBits convertResourceStageFlagtoVulkan(ShaderStage s);
+VkFormat convertIntoVulkanFormats(ShaderAttributeType type);
 
 b8 createShaderModule(VulkanInfo* header, const char* fileName,
                       VkShaderStageFlagBits stageFlagBits,
@@ -112,6 +113,24 @@ b8 vulkanShaderCreate(const ShaderRS* shaderConfig, Shader* outShader) {
     viewport.minDepth = 0.0f;
     viewport.maxDepth = 1.0f;
 
+
+    u32 totalAttrOffset = 0;
+    VkVertexInputAttributeDescription* attDescs = dinoCreate(VkVertexInputAttributeDescription);
+    for (u32 i = 0; i < shaderConfig->attributeCnt; i++){
+        VkVertexInputAttributeDescription att;
+        att.location = i;
+        att.binding = 0;
+        att.offset = totalAttrOffset;
+        att.format = convertIntoVulkanFormats(shaderConfig->attributes[i].type);
+        totalAttrOffset += shaderConfig->attributes[i].size;
+        dinoPush(attDescs, att);
+    }
+
+    VkVertexInputBindingDescription vertexBindingDesc;
+    vertexBindingDesc.binding = 0;
+    vertexBindingDesc.stride = sizeof(Vertex);
+    vertexBindingDesc.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
     VulkanPipelineConfig vpc;
     vpc.stages = stages;
     vpc.stageCnt = shaderConfig->stageCnt;
@@ -120,6 +139,7 @@ b8 vulkanShaderCreate(const ShaderRS* shaderConfig, Shader* outShader) {
     vpc.viewport = viewport;
     vpc.depthTested = false;
     vpc.renderpass = &vss->renderpass;
+    vpc.attributes = attDescs;
 
     FDEBUG("Create the pipeline")
     if (!vulkanPipelineCreate(vss, vpc, &vs->pipeline)) {
@@ -127,8 +147,35 @@ b8 vulkanShaderCreate(const ShaderRS* shaderConfig, Shader* outShader) {
         return false;
     }
 
+
     dinoDestroy(stages);
     return true;
+}
+
+VkFormat convertIntoVulkanFormats(ShaderAttributeType type){
+    switch (type) {
+        case SHADER_ATTRIBUTE_TYPE_INT8:
+            return VK_FORMAT_R8_SINT;
+        case SHADER_ATTRIBUTE_TYPE_INT16:
+            return VK_FORMAT_R16_SINT;
+        case SHADER_ATTRIBUTE_TYPE_INT32:
+            return VK_FORMAT_R32_SINT;
+        case SHADER_ATTRIBUTE_TYPE_UINT8:
+            return VK_FORMAT_R8_UINT;
+        case SHADER_ATTRIBUTE_TYPE_UINT16:
+            return VK_FORMAT_R16_UINT;
+        case SHADER_ATTRIBUTE_TYPE_UINT32:
+            return VK_FORMAT_R32_UINT;
+        case SHADER_ATTRIBUTE_TYPE_FLOAT32:
+            return VK_FORMAT_R32_SFLOAT;
+        case SHADER_ATTRIBUTE_TYPE_FLOAT32_2:
+            return VK_FORMAT_R32G32_SFLOAT;
+        case SHADER_ATTRIBUTE_TYPE_FLOAT32_3:
+            return VK_FORMAT_R32G32B32_SFLOAT;
+        case SHADER_ATTRIBUTE_TYPE_FLOAT32_4:
+            return VK_FORMAT_R32G32B32A32_SFLOAT;
+    }
+    return 0;
 }
 
 b8 vulkanShaderDestroy(Shader* shader) {

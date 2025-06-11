@@ -6,6 +6,7 @@
 #include "renderer/renderTypes.h"
 #include "renderer/vulkan/device.h"
 #include "renderer/vulkan/utils.h"
+#include "renderer/vulkan/vulkanBuffer.h"
 #include "renderer/vulkan/vulkanCommandBuffers.h"
 #include "renderer/vulkan/vulkanPlatform.h"
 #include "renderer/vulkan/vulkanRenderpass.h"
@@ -279,6 +280,32 @@ b8 vulkanInit(rendererBackend* backend, const char* appName, u64 appWidth,
     header.framebufferWidth = appWidth;
     header.framebufferHeight = appHeight;
 
+    Vertex vertices[3];
+    vertices[0].position = (vector2){0.0f, -0.5f};
+    vertices[1].position = (vector2){0.5f, 0.5f};
+    vertices[2].position = (vector2){-0.5f, 0.5f};
+    // vertices[3].position = (vector2){10.0f, 0.0f};
+
+    // Counter Clockwise
+    u32 indices[6] = {2, 1, 0, 3, 0, 1};
+
+    vulkanBufferCreate(&header, sizeof(vertices[0]) * 3, false,
+                       VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
+                           VK_BUFFER_USAGE_TRANSFER_DST_BIT |
+                           VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                       VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                           VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                       &header.vertexBuffer);
+
+    vulkanBufferBind(header.device.device, &header.vertexBuffer, 0);
+
+    void* data = vulkanBufferMapMem(header.device.device, 0,
+                                    header.vertexBuffer.bufferSize, 0,
+                                    &header.vertexBuffer);
+    vulkanBufferInsertData(data, &vertices, header.vertexBuffer.bufferSize);
+    vulkanBufferUnmapMem(header.device.device, &header.vertexBuffer);
+
+
     if (!vulkanShaderInit(&header)) {
         FERROR("Failed to init shader");
         return false;
@@ -294,6 +321,9 @@ void vulkanShutdown(rendererBackend* backend) {
     vkDeviceWaitIdle(header.device.device);
 
     vulkanShaderShutdown(&header);
+
+    vkDestroyBuffer(header.device.device, header.vertexBuffer.handle, header.allocator);
+    vkFreeMemory(header.device.device, header.vertexBuffer.bufferMemory, header.allocator);
 
     for (u32 i = 0; i < header.swapchain.imageCnt; i++) {
         vkDestroySemaphore(header.device.device,
@@ -337,14 +367,19 @@ void vulkanShutdown(rendererBackend* backend) {
 }
 
 b8 vulkanDraw() {
+    VkBuffer vertexBuffers[] = {header.vertexBuffer.handle};
+    VkDeviceSize offsets[] = {0};
+    vkCmdBindVertexBuffers(
+        header.graphicsCommandBuffers[header.curImageIdx].handle, 0, 1,
+        vertexBuffers, offsets);
 
-    vkCmdDraw(header.graphicsCommandBuffers[header.curImageIdx].handle, 3, 1, 0,
+    vkCmdDraw(header.graphicsCommandBuffers[header.curImageIdx].handle, header.vertexBuffer.bufferSize, 1, 0,
               0);
 
     return true;
 }
 
-b8 vulkanOnResize(u16 width, u16 height){
+b8 vulkanOnResize(u16 width, u16 height) {
     header.framebufferWidth = width;
     header.framebufferHeight = height;
     header.framebufferSizeGen++;
@@ -454,7 +489,7 @@ b8 vulkanBeginFrame(struct rendererBackend* backend, f32 deltaTime) {
     VulkanCommandBuffer* cb =
         &header.graphicsCommandBuffers[header.curImageIdx];
     vulkanCommandBufferReset(cb);
-    vulkanCommandBufferBegin(cb);
+    vulkanCommandBufferBegin(cb, 0);
 
     // Set viewport/scissor
 

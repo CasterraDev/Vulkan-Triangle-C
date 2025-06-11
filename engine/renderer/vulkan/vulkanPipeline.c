@@ -1,6 +1,8 @@
 #include "vulkanPipeline.h"
 #include "core/logger.h"
+#include "helpers/dinoarray.h"
 #include "renderer/vulkan/vulkanTypes.h"
+#include "resources/resourcesTypes.h"
 #include "vulkan/vulkan_core.h"
 
 b8 vulkanPipelineCreate(VulkanInfo* vi, VulkanPipelineConfig vpc,
@@ -14,13 +16,18 @@ b8 vulkanPipelineCreate(VulkanInfo* vi, VulkanPipelineConfig vpc,
     dsci.dynamicStateCount = 2;
     dsci.pDynamicStates = dynamicStates;
 
+    VkVertexInputBindingDescription vertexBindingDesc;
+    vertexBindingDesc.binding = 0;
+    vertexBindingDesc.stride = sizeof(Vertex);
+    vertexBindingDesc.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
     // Vertex Input
     VkPipelineVertexInputStateCreateInfo vici;
     vici.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-    vici.vertexAttributeDescriptionCount = 0;
-    vici.pVertexAttributeDescriptions = 0;
-    vici.vertexBindingDescriptionCount = 0;
-    vici.pVertexBindingDescriptions = 0;
+    vici.vertexAttributeDescriptionCount = dinoLength(vpc.attributes);
+    vici.pVertexAttributeDescriptions = vpc.attributes;
+    vici.vertexBindingDescriptionCount = 1;
+    vici.pVertexBindingDescriptions = &vertexBindingDesc;
 
     // Input Assembly
     VkPipelineInputAssemblyStateCreateInfo iaci;

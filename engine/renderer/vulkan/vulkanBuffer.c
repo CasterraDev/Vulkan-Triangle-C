@@ -20,7 +20,7 @@ i32 findMemoryType(VulkanInfo* vi, u32 typeFilter,
 }
 
 b8 vulkanBufferCreate(VulkanInfo* vi, u64 size, b8 useFreelist,
-                      VkBufferUsageFlagBits usageFlags,
+                      VkBufferUsageFlags usageFlags,
                       VkMemoryPropertyFlags memProperties,
                       VulkanBuffer* outBuffer) {
     outBuffer->bufferSize = size;
@@ -31,14 +31,13 @@ b8 vulkanBufferCreate(VulkanInfo* vi, u64 size, b8 useFreelist,
     VkBufferCreateInfo bci;
     bci.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     bci.size = size;
-    bci.flags = usageFlags;
+    bci.usage = usageFlags;
     bci.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    bci.flags = 0;
+    bci.pNext = 0;
 
-    if (vkCreateBuffer(vi->device.device, &bci, vi->allocator,
-                       &outBuffer->handle)) {
-        FERROR("Failed to create buffer");
-        return false;
-    }
+    VK_CHECK(vkCreateBuffer(vi->device.device, &bci, vi->allocator,
+                            &outBuffer->handle));
 
     VkMemoryRequirements memReq;
     vkGetBufferMemoryRequirements(vi->device.device, outBuffer->handle,
@@ -48,6 +47,7 @@ b8 vulkanBufferCreate(VulkanInfo* vi, u64 size, b8 useFreelist,
     allocInfo.allocationSize = memReq.size;
     allocInfo.memoryTypeIndex =
         findMemoryType(vi, memReq.memoryTypeBits, memProperties);
+    allocInfo.pNext = 0;
 
     if (vkAllocateMemory(vi->device.device, &allocInfo, vi->allocator,
                          &outBuffer->bufferMemory)) {
@@ -84,9 +84,9 @@ void vulkanBufferDestroy(VulkanInfo* vi, VulkanBuffer* buffer) {
     buffer->handle = 0;
 }
 
-b8 vulkanBufferCopy(VulkanInfo* vi, VkCommandPool cp, VkQueue queue, VkFence fence,
-                    VulkanBuffer* src, u64 srcOffset, u64 size,
-                    VulkanBuffer* dest, u64 destOffset){
+b8 vulkanBufferCopy(VulkanInfo* vi, VkCommandPool cp, VkQueue queue,
+                    VkFence fence, VulkanBuffer* src, u64 srcOffset, u64 size,
+                    VulkanBuffer* dest, u64 destOffset) {
     VulkanCommandBuffer vcb;
     vulkanCommandBufferAllocate(vi, cp, true, &vcb);
     vulkanCommandBufferBegin(&vcb, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
@@ -125,12 +125,12 @@ void vulkanBufferBind(VkDevice device, VulkanBuffer* buffer, u64 offset) {
                                 offset));
 }
 
-void vulkanBufferInsertData(void* memoryPtr, const void* data, u64 size){
+void vulkanBufferInsertData(void* memoryPtr, const void* data, u64 size) {
     fcopyMemory(memoryPtr, data, size);
 }
 
-b8 vulkanBufferAllocate(VulkanBuffer* buffer, u64 size, u64* outOffset){
-    if (!buffer->usesFreelist){
+b8 vulkanBufferAllocate(VulkanBuffer* buffer, u64 size, u64* outOffset) {
+    if (!buffer->usesFreelist) {
         FWARN("vulkanBufferAllocate: Buffer must use freelist to use this FN");
         return false;
     }
@@ -138,8 +138,8 @@ b8 vulkanBufferAllocate(VulkanBuffer* buffer, u64 size, u64* outOffset){
     return freelistAllocateBlock(&buffer->bufferFreelist, size, outOffset);
 }
 
-b8 vulkanBufferFree(VulkanBuffer* buffer, u64 size, u64 offset){
-    if (!buffer->usesFreelist){
+b8 vulkanBufferFree(VulkanBuffer* buffer, u64 size, u64 offset) {
+    if (!buffer->usesFreelist) {
         FWARN("vulkanBufferFree: Buffer must use freelist to use this FN");
         return false;
     }

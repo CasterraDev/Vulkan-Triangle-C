@@ -2,7 +2,7 @@
 #include "vulkanTypes.h"
 
 b8 vulkanBufferCreate(VulkanInfo* vi, u64 size, b8 useFreelist,
-                      VkBufferUsageFlagBits usageFlags,
+                      VkBufferUsageFlags usageFlags,
                       VkMemoryPropertyFlags memProperties,
                       VulkanBuffer* outBuffer);
 void vulkanBufferDestroy(VulkanInfo* vi, VulkanBuffer* buffer);

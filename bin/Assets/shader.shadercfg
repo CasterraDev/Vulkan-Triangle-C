@@ -2,4 +2,15 @@ name=FirstShader
 renderpass=world
 stages=vert,frag
 stagefiles=vert.spv,frag.spv
+supportsLocals=1
+supportsInstances=1
+# Attributes : name type(size)
+ATTRIBUTES
+in_position vec3
+in_texcoord vec2
+# Uniforms : name scope(below) type(size)
+# 3=global 2=instance 1=local
+UNIFORMS
+projection 3 mat4
+view 3 mat4
 

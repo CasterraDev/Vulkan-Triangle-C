@@ -9,18 +9,23 @@ typedef struct shaderSystemSettings {
 } shaderSystemSettings;
 
 typedef struct ShaderUniform {
+    char* name;
     u64 offset;
 
     u16 location;
     u16 uniformIdx;
     u16 size;
 
-    u8 descriptorSetIdx;
-
     ShaderScope scope;
 
     ShaderUniformType type;
 } ShaderUniform;
+
+typedef struct ShaderAttribute {
+    char* name;
+    u16 size;
+    ShaderAttributeType type;
+} ShaderAttribute;
 
 typedef struct Shader {
     u32 id;
@@ -29,15 +34,25 @@ typedef struct Shader {
     u32 refCnt;
     b8 autoDelete;
 
-    b8 hasInstances;
-    b8 hasLocals;
+    b8 supportsInstances;
+    b8 supportsLocals;
 
+    u32 globalUboSize;
+    u32 uboSize;
+    
     /** Memory Block for the uniform hashtable **/
     void* uniformHashtableBlock;
     /** Stores the idx of uniforms to use for the `uniforms` DinoArray **/
     hashtable uniformHashtable;
     /** DinoArray **/
     ShaderUniform* uniforms;
+
+    /** Memory Block for the attribute hashtable **/
+    void* attributeHashtableBlock;
+    /** Stores the idx of attributes to use for the `attributes` DinoArray **/
+    hashtable attributeHashtable;
+    /** DinoArray **/
+    ShaderAttribute* attributes;
 
     void* rendererData;
 } Shader;
