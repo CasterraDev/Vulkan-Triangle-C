@@ -113,10 +113,10 @@ b8 vulkanShaderCreate(const ShaderRS* shaderConfig, Shader* outShader) {
     viewport.minDepth = 0.0f;
     viewport.maxDepth = 1.0f;
 
-
     u32 totalAttrOffset = 0;
-    VkVertexInputAttributeDescription* attDescs = dinoCreate(VkVertexInputAttributeDescription);
-    for (u32 i = 0; i < shaderConfig->attributeCnt; i++){
+    VkVertexInputAttributeDescription* attDescs =
+        dinoCreate(VkVertexInputAttributeDescription);
+    for (u32 i = 0; i < shaderConfig->attributeCnt; i++) {
         VkVertexInputAttributeDescription att;
         att.location = i;
         att.binding = 0;
@@ -147,12 +147,11 @@ b8 vulkanShaderCreate(const ShaderRS* shaderConfig, Shader* outShader) {
         return false;
     }
 
-
     dinoDestroy(stages);
     return true;
 }
 
-VkFormat convertIntoVulkanFormats(ShaderAttributeType type){
+VkFormat convertIntoVulkanFormats(ShaderAttributeType type) {
     switch (type) {
         case SHADER_ATTRIBUTE_TYPE_INT8:
             return VK_FORMAT_R8_SINT;
@@ -200,7 +199,8 @@ b8 vulkanShaderDestroy(Shader* shader) {
 
 void vulkanShaderUse(Shader* shader) {
     VulkanShader* vs = (VulkanShader*)shader->rendererData;
-    vulkanPipelineBind(vss->graphicsCommandBuffers[vss->curImageIdx].handle, VK_PIPELINE_BIND_POINT_GRAPHICS, vs->pipeline.handle);
+    vulkanPipelineBind(vss->graphicsCommandBuffers[vss->curImageIdx].handle,
+                       VK_PIPELINE_BIND_POINT_GRAPHICS, vs->pipeline.handle);
 }
 
 b8 vulkanShaderApplyInstances(Shader* shader) {
@@ -208,6 +208,32 @@ b8 vulkanShaderApplyInstances(Shader* shader) {
 }
 
 b8 vulkanShaderApplyGlobals(Shader* shader) {
+    // TEMP
+    VulkanShader* vs = (VulkanShader*)shader->rendererData;
+
+    VkDescriptorBufferInfo bufferInfo;
+    bufferInfo.buffer = vss->uniformBuffers[vss->curImageIdx].handle;
+    bufferInfo.offset = 0;
+    bufferInfo.range = sizeof(Ubo);
+
+    VkWriteDescriptorSet descWrite;
+    descWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    descWrite.dstSet = vs->pipeline.descriptorSets[vss->curImageIdx];
+    descWrite.dstBinding = 0;
+    descWrite.dstArrayElement = 0;
+    descWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    descWrite.descriptorCount = 1;
+    descWrite.pBufferInfo = &bufferInfo;
+    descWrite.pImageInfo = 0;
+    descWrite.pTexelBufferView = 0;
+    descWrite.pNext = 0;
+
+    vkUpdateDescriptorSets(vss->device.device, 1, &descWrite, 0, 0);
+
+    vkCmdBindDescriptorSets(
+        vss->graphicsCommandBuffers[vss->curImageIdx].handle,
+        VK_PIPELINE_BIND_POINT_GRAPHICS, vs->pipeline.layout, 0, 1,
+        &vs->pipeline.descriptorSets[vss->curImageIdx], 0, 0);
     return false;
 }
 

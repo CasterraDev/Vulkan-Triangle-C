@@ -1,12 +1,19 @@
 #pragma once
 
 #include "defines.h"
+#include "math/matrixMath.h"
 #include "resources/resourcesTypes.h"
 #include "helpers/hashtable.h"
 
 typedef struct shaderSystemSettings {
     u32 maxShaders;
 } shaderSystemSettings;
+
+typedef struct Ubo {
+    mat4 model;
+    mat4 view;
+    mat4 proj;
+} Ubo;
 
 typedef struct ShaderUniform {
     char* name;

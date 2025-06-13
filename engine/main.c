@@ -7,7 +7,6 @@
 #include "renderer/renderer.h"
 #include "resources/resourceManager.h"
 #include "systems/shaderSystem.h"
-#include <stdint.h>
 
 #define APP_WIDTH 1280
 #define APP_HEIGHT 720

@@ -4,6 +4,7 @@
 #include "defines.h"
 #include "helpers/freelist.h"
 #include "math/matrixMath.h"
+#include "systems/shaderSystem.h"
 #include "vulkan/vulkan_core.h"
 
 // Checks the given expression's return value is OK.
@@ -127,6 +128,10 @@ typedef struct VulkanShaderStage {
 typedef struct VulkanPipeline {
     VkPipeline handle;
     VkPipelineLayout layout;
+    VkDescriptorSetLayout descriptorSetLayout;
+    VkDescriptorPool descriptorPool;
+    // Dino Array; maxNumOfFramesInFlight
+    VkDescriptorSet* descriptorSets;
 } VulkanPipeline;
 
 typedef struct VulkanShader {
@@ -176,5 +181,12 @@ typedef struct VulkanInfo {
     // Temp
     VulkanBuffer vertexBuffer;
     VulkanBuffer indicesBuffer;
+    // DinoArray same as maxNumOfFramesInFlight
+    VulkanBuffer* uniformBuffers;
+    // DinoArray same as maxNumOfFramesInFlight
+    void** uniformBuffersMapped;
+
+    // Maybe Temp
+    Shader* curShader;
     // End Temp
 } VulkanInfo;

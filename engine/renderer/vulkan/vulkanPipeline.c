@@ -3,6 +3,7 @@
 #include "helpers/dinoarray.h"
 #include "renderer/vulkan/vulkanTypes.h"
 #include "resources/resourcesTypes.h"
+#include "systems/shaderSystem.h"
 #include "vulkan/vulkan_core.h"
 
 b8 vulkanPipelineCreate(VulkanInfo* vi, VulkanPipelineConfig vpc,
@@ -20,6 +21,84 @@ b8 vulkanPipelineCreate(VulkanInfo* vi, VulkanPipelineConfig vpc,
     vertexBindingDesc.binding = 0;
     vertexBindingDesc.stride = sizeof(Vertex);
     vertexBindingDesc.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+    VkDescriptorPoolSize poolSize;
+    poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    poolSize.descriptorCount = vi->swapchain.maxNumOfFramesInFlight;
+
+    VkDescriptorPoolCreateInfo poolInfo;
+    poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    poolInfo.poolSizeCount = 1;
+    poolInfo.pPoolSizes = &poolSize;
+    poolInfo.maxSets = vi->swapchain.maxNumOfFramesInFlight;
+
+    VkDescriptorPool descriptorPool;
+    if (vkCreateDescriptorPool(vi->device.device, &poolInfo, vi->allocator,
+                               &descriptorPool) != VK_SUCCESS) {
+        FERROR("Failed to create descriptor pool");
+        return false;
+    }
+    outPipeline->descriptorPool = descriptorPool;
+
+    // Descriptor
+    VkDescriptorSetLayoutBinding uboLayoutBinding;
+    uboLayoutBinding.binding = 0;
+    uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    uboLayoutBinding.descriptorCount = 1;
+    uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    uboLayoutBinding.pImmutableSamplers = 0;
+
+    VkDescriptorSetLayout descriptorSetLayout;
+    VkDescriptorSetLayoutCreateInfo layoutInfo;
+    layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    layoutInfo.bindingCount = 1;
+    layoutInfo.pBindings = &uboLayoutBinding;
+
+    if (vkCreateDescriptorSetLayout(vi->device.device, &layoutInfo,
+                                    vi->allocator,
+                                    &descriptorSetLayout) != VK_SUCCESS) {
+        FERROR("Failed to create descriptor Set Layout");
+        return false;
+    }
+
+    outPipeline->descriptorSetLayout = descriptorSetLayout;
+
+    VkDescriptorSetLayout layouts[3] = {
+        descriptorSetLayout, descriptorSetLayout, descriptorSetLayout};
+
+    VkDescriptorSetAllocateInfo allocInfo;
+    allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    allocInfo.descriptorPool = descriptorPool;
+    allocInfo.descriptorSetCount = vi->swapchain.maxNumOfFramesInFlight;
+    allocInfo.pSetLayouts = layouts;
+
+    outPipeline->descriptorSets = dinoCreateReserveWithLengthSet(
+        vi->swapchain.maxNumOfFramesInFlight, VkDescriptorSet);
+    if (vkAllocateDescriptorSets(vi->device.device, &allocInfo,
+                                 outPipeline->descriptorSets)) {
+        FERROR("Failed to allocate descriptor sets");
+        return false;
+    }
+
+    for (u32 i = 0; i < vi->swapchain.maxNumOfFramesInFlight; i++) {
+        VkDescriptorBufferInfo bufferInfo;
+        bufferInfo.buffer = vi->uniformBuffers[i].handle;
+        bufferInfo.offset = 0;
+        bufferInfo.range = sizeof(Ubo);
+
+        VkWriteDescriptorSet descWrite;
+        descWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descWrite.dstSet = outPipeline->descriptorSets[i];
+        descWrite.dstBinding = 0;
+        descWrite.dstArrayElement = 0;
+        descWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        descWrite.descriptorCount = 1;
+        descWrite.pBufferInfo = &bufferInfo;
+        descWrite.pImageInfo = 0;
+        descWrite.pTexelBufferView = 0;
+
+        vkUpdateDescriptorSets(vi->device.device, 1, &descWrite, 0, 0);
+    }
 
     // Vertex Input
     VkPipelineVertexInputStateCreateInfo vici;
@@ -97,8 +176,8 @@ b8 vulkanPipelineCreate(VulkanInfo* vi, VulkanPipelineConfig vpc,
 
     VkPipelineLayoutCreateInfo plci;
     plci.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    plci.setLayoutCount = 0;
-    plci.pSetLayouts = 0;
+    plci.setLayoutCount = 1;
+    plci.pSetLayouts = &descriptorSetLayout;
     plci.pushConstantRangeCount = 0;
     plci.pPushConstantRanges = 0;
 
@@ -136,6 +215,17 @@ b8 vulkanPipelineCreate(VulkanInfo* vi, VulkanPipelineConfig vpc,
 }
 
 b8 vulkanPipelineDestroy(VulkanInfo* vi, VulkanPipeline* pipeline) {
+    if (pipeline->descriptorPool) {
+        vkDestroyDescriptorPool(vi->device.device, pipeline->descriptorPool,
+                                vi->allocator);
+    }
+
+    if (pipeline->descriptorSetLayout) {
+        vkDestroyDescriptorSetLayout(
+            vi->device.device, pipeline->descriptorSetLayout, vi->allocator);
+        pipeline->descriptorSetLayout = 0;
+    }
+
     if (pipeline->handle) {
         vkDestroyPipeline(vi->device.device, pipeline->handle, vi->allocator);
         pipeline->handle = 0;
@@ -149,6 +239,7 @@ b8 vulkanPipelineDestroy(VulkanInfo* vi, VulkanPipeline* pipeline) {
     return true;
 }
 
-void vulkanPipelineBind(VkCommandBuffer cb, VkPipelineBindPoint bindPoint, VkPipeline pipeline){
+void vulkanPipelineBind(VkCommandBuffer cb, VkPipelineBindPoint bindPoint,
+                        VkPipeline pipeline) {
     vkCmdBindPipeline(cb, bindPoint, pipeline);
 }

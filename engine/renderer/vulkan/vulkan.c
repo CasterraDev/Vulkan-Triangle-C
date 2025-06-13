@@ -2,6 +2,7 @@
 #include "core/fstring.h"
 #include "core/logger.h"
 #include "helpers/dinoarray.h"
+#include "math/fsnmath.h"
 #include "math/matrixMath.h"
 #include "renderer/renderTypes.h"
 #include "renderer/vulkan/device.h"
@@ -314,6 +315,7 @@ b8 vulkanInit(rendererBackend* backend, const char* appName, u64 appWidth,
 
     u16 indices[6] = {0, 1, 2, 2, 3, 0};
 
+    // Vertex Buffer
     vulkanBufferCreate(&header, sizeof(Vertex) * 1024, true,
                        VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
                            VK_BUFFER_USAGE_TRANSFER_DST_BIT |
@@ -331,7 +333,9 @@ b8 vulkanInit(rendererBackend* backend, const char* appName, u64 appWidth,
         FERROR("Failed to insert Data");
         return false;
     }
+    FDEBUG("Vertex Buffer Created");
 
+    // Index Buffer
     vulkanBufferCreate(&header, sizeof(u16) * 1024, true,
                        VK_BUFFER_USAGE_INDEX_BUFFER_BIT |
                            VK_BUFFER_USAGE_TRANSFER_DST_BIT |
@@ -349,6 +353,22 @@ b8 vulkanInit(rendererBackend* backend, const char* appName, u64 appWidth,
         FERROR("Failed to insert Data");
         return false;
     }
+    FDEBUG("Index Buffer Created");
+
+    // UBO
+    if (!header.uniformBuffers){
+        header.uniformBuffers = dinoCreateReserve(header.swapchain.maxNumOfFramesInFlight, VulkanBuffer);
+    }
+    if (!header.uniformBuffersMapped){
+        header.uniformBuffersMapped = dinoCreateReserve(header.swapchain.maxNumOfFramesInFlight, void*);
+    }
+    for (u32 i = 0; i < header.swapchain.maxNumOfFramesInFlight; i++){
+        vulkanBufferCreate(&header, sizeof(Ubo), false, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &header.uniformBuffers[i]);
+        vulkanBufferBind(header.device.device, &header.uniformBuffers[i], 0);
+        header.uniformBuffersMapped[i] = vulkanBufferMapMem(header.device.device, 0, sizeof(Ubo), 0, &header.uniformBuffers[i]);
+        dinoLengthSet(header.uniformBuffers, i);
+    }
+    FDEBUG("Uniform Buffers Created");
 
     if (!vulkanShaderInit(&header)) {
         FERROR("Failed to init shader");
@@ -366,8 +386,13 @@ void vulkanShutdown(rendererBackend* backend) {
 
     vulkanShaderShutdown(&header);
 
-    vulkanBufferDestroy(&header, &header.vertexBuffer);
+    for (u32 i = 0; i < header.swapchain.maxNumOfFramesInFlight; i++){
+        vulkanBufferDestroy(&header, &header.uniformBuffers[i]);
+    }
+    dinoDestroy(header.uniformBuffers);
+    dinoDestroy(header.uniformBuffersMapped);
     vulkanBufferDestroy(&header, &header.indicesBuffer);
+    vulkanBufferDestroy(&header, &header.vertexBuffer);
 
     for (u32 i = 0; i < header.swapchain.imageCnt; i++) {
         vkDestroySemaphore(header.device.device,
@@ -411,6 +436,16 @@ void vulkanShutdown(rendererBackend* backend) {
 }
 
 b8 vulkanDraw() {
+    Ubo ubo;
+    // TODO: Make a mat4Rotate FN
+    ubo.model = mat4Identity();
+    ubo.view = mat4LookAt((vector3){2.0f, 2.0f, 2.0f}, (vector3){0.0f, 0.0f, 0.0f}, (vector3){0.0f, 0.0f, 1.0f});
+    ubo.proj = mat4Perspective(45.0f, header.framebufferWidth / (float)header.framebufferHeight, .1f, 10.0f);
+
+    fcopyMemory(header.uniformBuffersMapped[header.curImageIdx], &ubo, sizeof(ubo));
+
+    vulkanShaderApplyGlobals(header.curShader);
+
     VkBuffer vertexBuffers[] = {header.vertexBuffer.handle};
     VkDeviceSize offsets[] = {0};
     vkCmdBindVertexBuffers(
@@ -511,7 +546,7 @@ b8 vulkanBeginFrame(struct rendererBackend* backend, f32 deltaTime) {
             dinoLengthSet(header.graphicsCommandBuffers,
                           header.swapchain.imageCnt);
         }
-        FDEBUG("Created Command Buffers");
+        FDEBUG("Created Resized Command Buffers");
 
         FINFO("Resized. Booting...");
         header.framebufferSizeGenLast = header.framebufferSizeGen;
@@ -626,6 +661,7 @@ b8 vulkanBeginRenderpass(struct rendererBackend* backend, u8 renderpassId) {
 
     // TODO: Temp stuff
     Shader* s = shaderGet("FirstShader");
+    header.curShader = s;
     vulkanShaderUse(s);
     return true;
 }
